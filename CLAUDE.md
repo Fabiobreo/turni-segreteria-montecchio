@@ -11,16 +11,16 @@ Web app per costruire i **turni mensili** di una segreteria di n persone, in sos
 
 ## Stack
 
-- **Next.js 15 (App Router) + React 19 + TypeScript**, Server Actions, Server Components.
-- **Prisma** ORM. Dev DB = **SQLite** (`prisma/dev.db`). Per il deploy si cambia `provider` in `schema.prisma` a `postgresql`.
-- **UI:** Material-UI v6 (MUI).
+- **Next.js 16 (App Router) + React 19 + TypeScript**, Server Actions, Server Components.
+- **Prisma** ORM. DB = **PostgreSQL** (provider `postgresql`, vedi `schema.prisma`). Connessione via `DATABASE_URL` (pooled) + `DIRECT_URL` (diretta, per `db push`/`migrate`). Vedi `.env.example`.
+- **UI:** Material-UI v9 (MUI).
 
 ## Comandi
 
 ```powershell
 npm install
 npx prisma generate
-npx prisma db push      # crea/aggiorna lo schema SQLite
+npx prisma db push      # crea/aggiorna lo schema sul DB Postgres
 npm run db:seed         # carica le 5 segretarie (prisma/seed.ts)
 npm run dev             # http://localhost:3000
 npm run db:maggio       # (opzionale) turni + disponibilità maggio 2026 (mese completo)
@@ -28,6 +28,8 @@ npm run db:maggio       # (opzionale) turni + disponibilità maggio 2026 (mese c
 
 `npm run build` · `npm run lint` · `npm run db:studio` (Prisma Studio).
 npm è in `C:\Program Files\nodejs\npm.cmd` — disponibile in PowerShell, **non** nel tool Bash.
+
+> ⚠️ **`npm run build` è il comando di deploy Vercel**: esegue `prisma db push --skip-generate --accept-data-loss && prisma generate && next build`. Quindi in locale **sincronizza il DB puntato da `.env` con perdita di dati** e rigenera il client. Per buildare in locale senza toccare il DB usa `npx next build`. Il `db push`+`generate` nel build serve perché Vercel cacha `node_modules`: senza, il client Prisma resta stale e i tipi non si aggiornano (es. errori su campi rimossi).
 
 ## Accessi (dev)
 
