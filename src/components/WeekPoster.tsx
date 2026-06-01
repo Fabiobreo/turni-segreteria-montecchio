@@ -1,23 +1,22 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Paper from "@mui/material/Paper";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import DownloadIcon from "@mui/icons-material/Download";
+import ShareIcon from "@mui/icons-material/Share";
 import { nodeToPngBlob, downloadBlob, shareBlob, slugFileName } from "@/lib/export-image";
 
 export type PosterShift = { start: string; end: string };
 export type PosterSecretary = {
-  id: string;
-  name: string;
-  color: string;
-  /** 7 celle (lun..dom); ogni cella è la lista dei turni di quel giorno */
+  id: string; name: string; color: string; weekHours: string;
   days: PosterShift[][];
-  weekHours: string; // ore totali settimana già formattate
 };
 
 export function WeekPoster({
-  weekLabel,
-  dayHeaders, // 7 etichette { num, name, weekend }
-  secretaries,
-  hasGaps,
+  weekLabel, dayHeaders, secretaries, hasGaps,
 }: {
   weekLabel: string;
   dayHeaders: { num: number; name: string; weekend: boolean }[];
@@ -32,55 +31,51 @@ export function WeekPoster({
 
   async function onDownload() {
     setBusy(true); setMsg(null);
-    try {
-      if (!ref.current) return;
-      downloadBlob(await nodeToPngBlob(ref.current), fileName);
-      setMsg("Immagine scaricata ✓");
-    } catch { setMsg("Errore durante la generazione dell'immagine."); }
+    try { if (!ref.current) return; downloadBlob(await nodeToPngBlob(ref.current), fileName); setMsg("Immagine scaricata ✓"); }
+    catch { setMsg("Errore durante la generazione dell'immagine."); }
     finally { setBusy(false); }
   }
-
   async function onShare() {
     setBusy(true); setMsg(null);
     try {
       if (!ref.current) return;
       const blob = await nodeToPngBlob(ref.current);
       const shared = await shareBlob(blob, fileName, title);
-      if (!shared) { downloadBlob(blob, fileName); setMsg("Condivisione diretta non disponibile qui: immagine scaricata, allegala su WhatsApp."); }
+      if (!shared) { downloadBlob(blob, fileName); setMsg("Condivisione diretta non disponibile: immagine scaricata."); }
       else setMsg("Condiviso ✓");
-    } catch (e) {
-      if ((e as Error)?.name !== "AbortError") setMsg("Condivisione non riuscita.");
-    } finally { setBusy(false); }
+    } catch (e) { if ((e as Error)?.name !== "AbortError") setMsg("Condivisione non riuscita."); }
+    finally { setBusy(false); }
   }
 
   const anyShift = secretaries.some((s) => s.days.some((d) => d.length > 0));
 
   return (
-    <div className="card pad">
-      <div className="row" style={{ alignItems: "center", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <h2 className="col" style={{ margin: 0 }}>Griglia condivisibile</h2>
-        <button className="btn" onClick={onDownload} disabled={busy}>{busy ? "Genero…" : "⬇️ Scarica PNG"}</button>
-        <button className="btn primary" onClick={onShare} disabled={busy}>📷 Condividi (WhatsApp)</button>
-      </div>
+    <Paper sx={{ p: 2 }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 2, flexWrap: "wrap", gap: 1 }}>
+        <Typography variant="h3" sx={{ flex: 1 }}>Griglia condivisibile</Typography>
+        <Button size="small" variant="outlined" startIcon={<DownloadIcon />} onClick={onDownload} disabled={busy}>
+          {busy ? "Genero…" : "Scarica PNG"}
+        </Button>
+        <Button size="small" variant="contained" startIcon={<ShareIcon />} onClick={onShare} disabled={busy}>
+          Condividi (WhatsApp)
+        </Button>
+      </Box>
 
-      {/* nodo catturato come immagine */}
       <div ref={ref} className="poster">
         <div className="poster-head">
           <div className="pdot" />
-          <div className="col">
+          <div className="col" style={{ flex: 1 }}>
             <h2>Turni Segreteria</h2>
             <div className="sub" style={{ textTransform: "capitalize" }}>{weekLabel}</div>
           </div>
         </div>
-
         <table className="poster-grid">
           <thead>
             <tr>
               <th className="who">Segretaria</th>
               {dayHeaders.map((d, i) => (
                 <th key={i} className={d.weekend ? "we" : undefined}>
-                  <span className="dn">{d.num}</span>
-                  {d.name}
+                  <span className="dn">{d.num}</span>{d.name}
                 </th>
               ))}
             </tr>
@@ -97,13 +92,9 @@ export function WeekPoster({
                 {s.days.map((shifts, i) => (
                   <td key={i}>
                     <div className={`pg-cell${dayHeaders[i].weekend ? " we" : ""}${shifts.length === 0 ? " off" : ""}`}>
-                      {shifts.length === 0 ? (
-                        <span className="pg-dash">—</span>
-                      ) : (
-                        shifts.map((sh, j) => (
-                          <span key={j} className="pg-pill">{sh.start}<br />{sh.end}</span>
-                        ))
-                      )}
+                      {shifts.length === 0
+                        ? <span className="pg-dash">—</span>
+                        : shifts.map((sh, j) => <span key={j} className="pg-pill">{sh.start}<br />{sh.end}</span>)}
                     </div>
                   </td>
                 ))}
@@ -111,19 +102,18 @@ export function WeekPoster({
             ))}
           </tbody>
         </table>
-
         <div className="poster-foot">
-          <span>Orari ufficio: Lun–Ven 08:00–20:30 · Sab–Dom 09:00–19:30</span>
-          {hasGaps && <span className="gapnote">⚠ Attenzione: ci sono fasce ancora scoperte</span>}
+          <span>Lun–Ven 08:00–20:30 · Sab–Dom 09:00–19:30</span>
+          {hasGaps && <span className="gapnote">⚠ Fasce ancora scoperte</span>}
           <span style={{ marginLeft: "auto" }}>Generato con Gestione Turni</span>
         </div>
       </div>
 
-      {!anyShift && <p className="small muted" style={{ marginTop: 10 }}>Nessun turno in questa settimana: la griglia è vuota.</p>}
-      {msg && <p className="small" style={{ marginTop: 10 }}>{msg}</p>}
-      <p className="small muted" style={{ marginTop: 6 }}>
-        Da telefono <b>Condividi</b> apre WhatsApp con l&apos;immagine. Da PC scarica il PNG e allegalo al gruppo.
-      </p>
-    </div>
+      {!anyShift && <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Nessun turno in questa settimana.</Typography>}
+      {msg && <Typography variant="body2" sx={{ mt: 1 }}>{msg}</Typography>}
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.75 }}>
+        Da telefono <strong>Condividi</strong> apre WhatsApp. Da PC scarica il PNG e allegalo al gruppo.
+      </Typography>
+    </Paper>
   );
 }

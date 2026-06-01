@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { ThemeRegistry } from "@/components/ThemeRegistry";
 
 export const metadata: Metadata = {
   title: "Gestione Turni — Segreteria",
@@ -14,9 +15,9 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="it">
-      {/* suppressHydrationWarning: alcune estensioni del browser (es. Grammarly) iniettano
-          attributi nel <body> dopo il render del server, generando un falso warning di idratazione. */}
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <ThemeRegistry>{children}</ThemeRegistry>
+      </body>
     </html>
   );
 }

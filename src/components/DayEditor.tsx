@@ -5,8 +5,22 @@ import { useRouter } from "next/navigation";
 import { saveShift, deleteShift } from "@/app/manager/actions";
 import { toMinutes, durationHours, formatHours } from "@/lib/time";
 import { coverageGaps, maxConcurrent, assignLanes } from "@/lib/coverage";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
+import MenuItem from "@mui/material/MenuItem";
+import Chip from "@mui/material/Chip";
+import Alert from "@mui/material/Alert";
+import Divider from "@mui/material/Divider";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 
-type Sec = { id: string; name: string; color: string; weeklyMax: number };
+type Sec   = { id: string; name: string; color: string; weeklyMax: number };
 type Shift = { id: string; secretaryId: string; start: string; end: string };
 type Avail = { secretaryId: string; status: string; start: string | null; end: string | null; note: string | null };
 type RangeStatus = "si" | "no" | "non_indicata";
@@ -14,86 +28,73 @@ type RangeStatus = "si" | "no" | "non_indicata";
 export function DayEditor({
   date, open, close, weekLabel, secretaries, shifts, availabilities, monthlyHours, weeklyHours,
 }: {
-  date: string;
-  open: string;
-  close: string;
-  weekLabel: string;
-  secretaries: Sec[];
-  shifts: Shift[];
-  availabilities: Avail[];
-  monthlyHours: Record<string, number>;
-  weeklyHours: Record<string, number>;
+  date: string; open: string; close: string; weekLabel: string;
+  secretaries: Sec[]; shifts: Shift[]; availabilities: Avail[];
+  monthlyHours: Record<string, number>; weeklyHours: Record<string, number>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<{ id: string | null; secretaryId: string; start: string; end: string } | null>(null);
 
-  const secById = new Map(secretaries.map((s) => [s.id, s]));
+  const secById   = new Map(secretaries.map((s) => [s.id, s]));
   const availBySec = new Map(availabilities.map((a) => [a.secretaryId, a]));
-  const gaps = coverageGaps(shifts, open, close);
-  const overCapacity = maxConcurrent(shifts) > 2;
+  const gaps       = coverageGaps(shifts, open, close);
+  const overCap    = maxConcurrent(shifts) > 2;
   const { items, lanes } = assignLanes(shifts);
-  const trackH = Math.max(34, lanes * 34);
-
+  const trackH     = Math.max(34, lanes * 34);
   const oMin = toMinutes(open);
   const span = toMinutes(close) - oMin;
-  const pct = (t: string) => ((toMinutes(t) - oMin) / span) * 100;
+  const pct  = (t: string) => ((toMinutes(t) - oMin) / span) * 100;
 
-  // stato disponibilità di una segretaria per una fascia [start,end]
   function availForRange(secId: string, start: string, end: string): RangeStatus {
     const a = availBySec.get(secId);
     if (!a) return "non_indicata";
     if (a.status === "disponibile") return "si";
     if (a.status === "non_disponibile") return "no";
-    if (a.status === "parziale" && a.start && a.end) {
+    if (a.status === "parziale" && a.start && a.end)
       return toMinutes(a.start) <= toMinutes(start) && toMinutes(end) <= toMinutes(a.end) ? "si" : "no";
-    }
     return "non_indicata";
   }
 
   function startAdd(secretaryId = secretaries[0]?.id ?? "", start = open, end = "14:00") {
-    setError(null);
-    setForm({ id: null, secretaryId, start, end });
+    setError(null); setForm({ id: null, secretaryId, start, end });
   }
-  function startEdit(s: Shift) {
-    setError(null);
-    setForm({ id: s.id, secretaryId: s.secretaryId, start: s.start, end: s.end });
-  }
+  function startEdit(s: Shift) { setError(null); setForm({ id: s.id, secretaryId: s.secretaryId, start: s.start, end: s.end }); }
 
   function submit() {
     if (!form) return;
     setError(null);
     startTransition(async () => {
-      const res = await saveShift({
-        id: form.id ?? undefined, date, secretaryId: form.secretaryId, start: form.start, end: form.end,
-      });
+      const res = await saveShift({ id: form.id ?? undefined, date, secretaryId: form.secretaryId, start: form.start, end: form.end });
       if (!res.ok) { setError(res.error ?? "Errore"); return; }
-      setForm(null);
-      router.refresh();
+      setForm(null); router.refresh();
     });
   }
   function remove(id: string) {
     startTransition(async () => { await deleteShift(id); router.refresh(); });
   }
 
-  const warn =
-    form && availForRange(form.secretaryId, form.start, form.end) !== "si"
-      ? availForRange(form.secretaryId, form.start, form.end) === "no"
-        ? "La segretaria selezionata NON è disponibile in questa fascia."
-        : "Disponibilità non indicata per questa segretaria in questo giorno."
-      : null;
+  const availWarn = form
+    ? availForRange(form.secretaryId, form.start, form.end) === "no"
+      ? "La segretaria selezionata NON è disponibile in questa fascia."
+      : availForRange(form.secretaryId, form.start, form.end) === "non_indicata"
+      ? "Disponibilità non indicata per questa segretaria in questo giorno."
+      : null
+    : null;
 
   return (
-    <div className="row" style={{ flexWrap: "wrap" }}>
+    <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
       {/* COLONNA SINISTRA */}
-      <div className="col" style={{ minWidth: 440 }}>
-        <div className="card pad stack">
-          <div className="row" style={{ alignItems: "center" }}>
-            <h3 className="col">Copertura del giorno</h3>
-            {gaps.length === 0 ? <span className="tag ok">✓ Copertura completa</span> : <span className="tag bad">⚠ {gaps.length} fascia/e scoperta/e</span>}
-            {overCapacity && <span className="tag bad">⚠ più di 2 persone</span>}
-          </div>
+      <Box sx={{ flex: 1, minWidth: 440 }}>
+        <Paper sx={{ p: 2 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2, flexWrap: "wrap" }}>
+            <Typography variant="h3" sx={{ flex: 1 }}>Copertura del giorno</Typography>
+            {gaps.length === 0
+              ? <Chip label="✓ Copertura completa" color="success" size="small" />
+              : <Chip label={`⚠ ${gaps.length} fascia/e scoperta/e`} color="error" size="small" />}
+            {overCap && <Chip label="⚠ più di 2 persone" color="error" size="small" />}
+          </Box>
 
           {/* timeline */}
           <div className="timeline">
@@ -104,7 +105,8 @@ export function DayEditor({
               {items.map(({ shift, lane }) => {
                 const sec = secById.get(shift.secretaryId);
                 return (
-                  <div key={shift.id} className={`block ${sec?.color ?? ""}`} title={`${sec?.name} ${shift.start}–${shift.end}`}
+                  <div key={shift.id} className={`block ${sec?.color ?? ""}`}
+                    title={`${sec?.name} ${shift.start}–${shift.end}`}
                     style={{ left: `${pct(shift.start)}%`, width: `${pct(shift.end) - pct(shift.start)}%`, top: lane * 34, height: 30 }}>
                     {sec?.name} {shift.start}–{shift.end}
                   </div>
@@ -116,173 +118,192 @@ export function DayEditor({
 
           {/* fasce scoperte con chi è disponibile */}
           {gaps.length > 0 && (
-            <div className="stack">
+            <Box sx={{ mt: 2, display: "flex", flexDirection: "column", gap: 1 }}>
               {gaps.map((g, i) => {
-                const free = secretaries.filter((s) => availForRange(s.id, g.start, g.end) === "si");
+                const free    = secretaries.filter((s) => availForRange(s.id, g.start, g.end) === "si");
                 const unknown = secretaries.filter((s) => availForRange(s.id, g.start, g.end) === "non_indicata");
                 return (
-                  <div key={i} className="card pad" style={{ background: "var(--red-soft)", borderColor: "#f3c6c1" }}>
-                    <div className="row" style={{ alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <span className="tag bad">▨ scoperto {g.start}–{g.end}</span>
-                      <span className="small muted">disponibili:</span>
-                      {free.length === 0 && unknown.length === 0 && <span className="small">nessuna 😕</span>}
+                  <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: "#fff5f5", borderColor: "#f3c6c1" }}>
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
+                      <Chip label={`▨ scoperto ${g.start}–${g.end}`} color="error" size="small" />
+                      <Typography variant="caption" color="text.secondary">disponibili:</Typography>
+                      {free.length === 0 && unknown.length === 0 && <Typography variant="caption">nessuna 😕</Typography>}
                       {free.map((s) => (
-                        <button key={s.id} className={`chip ${s.color}`} style={{ display: "inline", cursor: "pointer", border: 0 }}
-                          title={`Assegna ${s.name} ${g.start}–${g.end}`} onClick={() => startAdd(s.id, g.start, g.end)}>
+                        <Box key={s.id} component="button" onClick={() => startAdd(s.id, g.start, g.end)}
+                          className={`chip ${s.color}`}
+                          sx={{ display: "inline", cursor: "pointer", border: 0, fontFamily: "inherit" }}>
                           + {s.name}
-                        </button>
+                        </Box>
                       ))}
                       {unknown.map((s) => (
-                        <button key={s.id} className="tag neutral" style={{ cursor: "pointer", border: 0 }}
-                          title={`Disponibilità non indicata — assegna comunque`} onClick={() => startAdd(s.id, g.start, g.end)}>
-                          {s.name}?
-                        </button>
+                        <Chip key={s.id} label={`${s.name}?`} size="small" onClick={() => startAdd(s.id, g.start, g.end)}
+                          sx={{ cursor: "pointer" }} />
                       ))}
-                    </div>
-                  </div>
+                    </Box>
+                  </Paper>
                 );
               })}
-            </div>
+            </Box>
           )}
 
-          <hr className="soft" />
+          <Divider sx={{ my: 2 }} />
 
-          {/* lista turni */}
-          <div className="row" style={{ alignItems: "center" }}>
-            <h3 className="col">Turni assegnati</h3>
-            <button className="btn sm primary" onClick={() => startAdd()} disabled={pending}>+ Aggiungi turno</button>
-          </div>
+          <Box sx={{ display: "flex", alignItems: "center", mb: 1.5 }}>
+            <Typography variant="h3" sx={{ flex: 1 }}>Turni assegnati</Typography>
+            <Button size="small" variant="contained" onClick={() => startAdd()} disabled={pending}>+ Aggiungi turno</Button>
+          </Box>
 
-          {shifts.length === 0 && !form && <p className="muted small">Nessun turno. Aggiungine uno per coprire la giornata.</p>}
+          {shifts.length === 0 && !form && (
+            <Typography variant="body2" color="text.secondary">Nessun turno. Aggiungine uno per coprire la giornata.</Typography>
+          )}
 
-          {shifts.map((s) => {
-            const sec = secById.get(s.secretaryId);
-            if (form?.id === s.id) return <div key={s.id}>{ShiftForm()}</div>;
-            return (
-              <div key={s.id} className="card pad">
-                <div className="row" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                  <span className={`chip ${sec?.color ?? ""}`} style={{ display: "inline" }}>{sec?.name}</span>
-                  <b>{s.start}–{s.end}</b>
-                  <span className="tag info">{formatHours(durationHours(s.start, s.end))} h</span>
-                  <span className="sp" style={{ flex: 1 }} />
-                  <button className="btn sm" onClick={() => startEdit(s)} disabled={pending}>Modifica</button>
-                  <button className="btn sm ghost" style={{ color: "var(--red)" }} onClick={() => remove(s.id)} disabled={pending}>Rimuovi</button>
-                </div>
-              </div>
-            );
-          })}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {shifts.map((s) => {
+              const sec = secById.get(s.secretaryId);
+              if (form?.id === s.id) return <Box key={s.id}>{ShiftForm()}</Box>;
+              return (
+                <Paper key={s.id} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                    <span className={`chip ${sec?.color ?? ""}`} style={{ display: "inline" }}>{sec?.name}</span>
+                    <Typography sx={{ fontWeight: 700 }}>{s.start}–{s.end}</Typography>
+                    <Chip label={`${formatHours(durationHours(s.start, s.end))} h`} size="small" color="info" />
+                    <Box sx={{ flex: 1 }} />
+                    <Button size="small" variant="outlined" onClick={() => startEdit(s)} disabled={pending}>Modifica</Button>
+                    <Button size="small" variant="text" color="error" onClick={() => remove(s.id)} disabled={pending}>Rimuovi</Button>
+                  </Box>
+                </Paper>
+              );
+            })}
+            {form && form.id === null && ShiftForm()}
+          </Box>
 
-          {form && form.id === null && ShiftForm()}
-
-          <div className="note">ℹ️ Il raddoppio lo decidi tu: aggiungi un turno sovrapposto nelle fasce da rinforzare.</div>
-        </div>
-      </div>
+          <Alert severity="info" sx={{ mt: 2, fontSize: "0.8rem" }}>
+            Il raddoppio lo decidi tu: aggiungi un turno sovrapposto nelle fasce da rinforzare.
+          </Alert>
+        </Paper>
+      </Box>
 
       {/* COLONNA DESTRA */}
-      <div style={{ width: 380 }}>
-        {/* ORE: tetto settimanale + contatore mese */}
-        <div className="card pad stack" style={{ marginBottom: 16 }}>
-          <h3>Ore allocate</h3>
-          <div className="small muted">Settimana: {weekLabel}</div>
-          <table>
-            <thead>
-              <tr><th>Segretaria</th><th>Settimana</th><th>Mese</th></tr>
-            </thead>
-            <tbody>
+      <Box sx={{ width: 380, display: "flex", flexDirection: "column", gap: 2 }}>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h3" sx={{ mb: 0.5 }}>Ore allocate</Typography>
+          <Typography variant="caption" color="text.secondary">Settimana: {weekLabel}</Typography>
+          <Table size="small" sx={{ mt: 1 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Segretaria</TableCell>
+                <TableCell align="center">Settimana</TableCell>
+                <TableCell align="right">Mese</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {secretaries.map((s) => {
                 const w = weeklyHours[s.id] ?? 0;
                 const m = monthlyHours[s.id] ?? 0;
                 const wMax = s.weeklyMax || 0;
-                const wcls = wMax > 0 && w > wMax ? "bad" : wMax > 0 && w >= wMax ? "warn" : "ok";
+                const color = wMax > 0 && w > wMax ? "error" : wMax > 0 && w >= wMax ? "warning" : "success";
                 return (
-                  <tr key={s.id}>
-                    <td><span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span></td>
-                    <td><span className={`tag ${wcls}`}>{formatHours(w)}{wMax ? ` / ${wMax}` : ""}</span></td>
-                    <td className="small muted" title="ore lavorate questo mese">{formatHours(m)} h</td>
-                  </tr>
+                  <TableRow key={s.id}>
+                    <TableCell><span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span></TableCell>
+                    <TableCell align="center">
+                      <Chip label={`${formatHours(w)}${wMax ? ` / ${wMax}` : ""}`} size="small" color={color} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="caption" color="text.secondary">{formatHours(m)} h</Typography>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-          <p className="small muted">Settimana (allocate / tetto) — verde: sotto · giallo: al tetto · rosso: oltre. Mese: ore già lavorate (solo conteggio).</p>
-        </div>
+            </TableBody>
+          </Table>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+            Verde: sotto tetto · Giallo: al tetto · Rosso: oltre.
+          </Typography>
+        </Paper>
 
-        {/* DISPONIBILITÀ del giorno */}
-        <div className="card pad stack">
-          <h3>Disponibilità del giorno</h3>
-          <table>
-            <thead><tr><th>Segretaria</th><th>Disp.</th></tr></thead>
-            <tbody>
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="h3" sx={{ mb: 1.5 }}>Disponibilità del giorno</Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Segretaria</TableCell>
+                <TableCell align="right">Disp.</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
               {secretaries.map((s) => {
                 const a = availBySec.get(s.id);
-                let dtag = <span className="tag neutral">—</span>;
+                let chip = <Chip label="—" size="small" />;
                 let detail = "non indicata";
-                if (a?.status === "disponibile") { dtag = <span className="tag ok">Sì</span>; detail = "tutto il giorno"; }
-                else if (a?.status === "parziale") { dtag = <span className="tag warn">Parz.</span>; detail = `${a.start}–${a.end}`; }
-                else if (a?.status === "non_disponibile") { dtag = <span className="tag bad">No</span>; detail = "non disponibile"; }
+                if (a?.status === "disponibile") { chip = <Chip label="Sì" size="small" color="success" />; detail = "tutto il giorno"; }
+                else if (a?.status === "parziale") { chip = <Chip label="Parz." size="small" color="warning" />; detail = `${a.start}–${a.end}`; }
+                else if (a?.status === "non_disponibile") { chip = <Chip label="No" size="small" color="error" />; detail = "non disponibile"; }
                 return (
-                  <tr key={s.id}>
-                    <td>{s.name}<div className="small muted">{detail}{a?.note ? ` · "${a.note}"` : ""}</div></td>
-                    <td>{dtag}</td>
-                  </tr>
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      {s.name}
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+                        {detail}{a?.note ? ` · "${a.note}"` : ""}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">{chip}</TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+            </TableBody>
+          </Table>
+        </Paper>
+      </Box>
+    </Box>
   );
 
   function ShiftForm() {
     if (!form) return null;
     return (
-      <div className="card pad" style={{ borderStyle: "dashed" }}>
-        <div className="row" style={{ alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <b style={{ width: 70 }}>{form.id ? "Modifica" : "Nuovo"}</b>
-          <select className="input" value={form.secretaryId} onChange={(e) => setForm({ ...form, secretaryId: e.target.value })}>
-            {secretaries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <input className="input" style={{ width: 90 }} type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} />
-          <span>–</span>
-          <input className="input" style={{ width: 90 }} type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} />
-          <span className="tag info">{formatHours(Math.max(0, durationHours(form.start, form.end)))} h</span>
-          <button className="btn sm primary" onClick={submit} disabled={pending}>{pending ? "Salvo…" : "Salva"}</button>
-          <button className="btn sm ghost" onClick={() => { setForm(null); setError(null); }} disabled={pending}>Annulla</button>
-        </div>
+      <Paper variant="outlined" sx={{ p: 1.5, borderStyle: "dashed" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
+          <Typography sx={{ fontWeight: 700, width: 70 }}>{form.id ? "Modifica" : "Nuovo"}</Typography>
+          <TextField select size="small" value={form.secretaryId} onChange={(e) => setForm({ ...form, secretaryId: e.target.value })} sx={{ minWidth: 120 }}>
+            {secretaries.map((s) => <MenuItem key={s.id} value={s.id}>{s.name}</MenuItem>)}
+          </TextField>
+          <TextField size="small" type="time" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} sx={{ width: 110 }} />
+          <Typography>–</Typography>
+          <TextField size="small" type="time" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} sx={{ width: 110 }} />
+          <Chip label={`${formatHours(Math.max(0, durationHours(form.start, form.end)))} h`} size="small" color="info" />
+          <Button size="small" variant="contained" onClick={submit} disabled={pending}>{pending ? "Salvo…" : "Salva"}</Button>
+          <Button size="small" variant="text" onClick={() => { setForm(null); setError(null); }} disabled={pending}>Annulla</Button>
+        </Box>
 
-        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <span className="small muted">Preset:</span>
-          <button className="btn sm" onClick={() => setForm({ ...form, start: open, end: "14:00" })}>Mattina {open}–14:00</button>
-          <button className="btn sm" onClick={() => setForm({ ...form, start: "14:00", end: close })}>Pomeriggio 14:00–{close}</button>
-          <button className="btn sm" onClick={() => setForm({ ...form, start: open, end: close })}>Tutto {open}–{close}</button>
-        </div>
+        <Box sx={{ display: "flex", gap: 1, mt: 1, flexWrap: "wrap", alignItems: "center" }}>
+          <Typography variant="caption" color="text.secondary">Preset:</Typography>
+          <Button size="small" variant="outlined" onClick={() => setForm({ ...form, start: open, end: "14:00" })}>Mattina {open}–14:00</Button>
+          <Button size="small" variant="outlined" onClick={() => setForm({ ...form, start: "14:00", end: close })}>Pomeriggio 14:00–{close}</Button>
+          <Button size="small" variant="outlined" onClick={() => setForm({ ...form, start: open, end: close })}>Tutto {open}–{close}</Button>
+        </Box>
 
-        {/* chi è disponibile per la fascia selezionata */}
-        <div className="card pad" style={{ marginTop: 8, background: "#fafbfc" }}>
-          <div className="small muted" style={{ marginBottom: 6 }}>
-            Disponibili per <b>{form.start}–{form.end}</b> (tocca per assegnare):
-          </div>
-          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+        <Paper variant="outlined" sx={{ p: 1.5, mt: 1, bgcolor: "#fafbfc" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.75 }}>
+            Disponibili per <strong>{form.start}–{form.end}</strong> (tocca per assegnare):
+          </Typography>
+          <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap" }}>
             {secretaries.map((s) => {
               const st = availForRange(s.id, form.start, form.end);
               const selected = s.id === form.secretaryId;
-              const cls = st === "si" ? "ok" : st === "no" ? "bad" : "neutral";
-              const icon = st === "si" ? "✓" : st === "no" ? "✕" : "?";
+              const color = st === "si" ? "success" : st === "no" ? "error" : "default";
+              const icon  = st === "si" ? "✓" : st === "no" ? "✕" : "?";
               return (
-                <button key={s.id} className={`tag ${cls}`}
-                  style={{ cursor: "pointer", border: selected ? "2px solid var(--ink)" : "1px solid transparent" }}
-                  onClick={() => setForm({ ...form, secretaryId: s.id })}>
-                  {icon} {s.name}
-                </button>
+                <Chip key={s.id} label={`${icon} ${s.name}`} size="small" color={color}
+                  onClick={() => setForm({ ...form, secretaryId: s.id })}
+                  variant={selected ? "filled" : "outlined"}
+                  sx={{ cursor: "pointer" }} />
               );
             })}
-          </div>
-        </div>
+          </Box>
+        </Paper>
 
-        {warn && <div className="note" style={{ marginTop: 8 }}>⚠ {warn}</div>}
-        {error && <div className="tag bad" style={{ marginTop: 8 }}>{error}</div>}
-      </div>
+        {availWarn && <Alert severity="warning" sx={{ mt: 1, fontSize: "0.8rem" }}>{availWarn}</Alert>}
+        {error && <Alert severity="error" sx={{ mt: 1, fontSize: "0.8rem" }}>{error}</Alert>}
+      </Paper>
     );
   }
 }

@@ -1,9 +1,12 @@
 "use client";
 
+import Button from "@mui/material/Button";
+import PrintIcon from "@mui/icons-material/Print";
+
 export function PrintButton() {
   return (
-    <button className="btn" onClick={() => window.print()}>
-      🖨️ Stampa / PDF
-    </button>
+    <Button variant="outlined" size="small" startIcon={<PrintIcon />} onClick={() => window.print()}>
+      Stampa / PDF
+    </Button>
   );
 }

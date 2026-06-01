@@ -5,6 +5,10 @@ import {
   monthDates, monthName, monthKeyOf, toISODate, addMonthsKey,
   dayShort, dayNum, durationHours, formatHours,
 } from "@/lib/time";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
+import Paper from "@mui/material/Paper";
 
 export default async function MyShiftsPage({
   params, searchParams,
@@ -32,47 +36,54 @@ export default async function MyShiftsPage({
   return (
     <div className="mobile">
       <div className="mhead">
-        <div className="row" style={{ alignItems: "center" }}>
-          <div className="col">
-            <div className="small muted">{sec.name}</div>
-            <h2 style={{ margin: 0, textTransform: "capitalize" }}>I miei turni · {monthName(monthKey)} {monthKey.slice(0, 4)}</h2>
-          </div>
-          <Link className="btn sm" href={`/d/${token}/turni?mese=${addMonthsKey(monthKey, -1)}`}>‹</Link>
-          <Link className="btn sm" href={`/d/${token}/turni?mese=${addMonthsKey(monthKey, 1)}`}>›</Link>
-        </div>
-        <div className="row" style={{ marginTop: 8, gap: 8 }}>
-          <span className="tag info">Ore lavorate questo mese: {formatHours(total)}h</span>
-        </div>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="caption" color="text.secondary">{sec.name}</Typography>
+            <Typography variant="h2" component="h1" sx={{ textTransform: "capitalize" }}>
+              I miei turni · {monthName(monthKey)} {monthKey.slice(0, 4)}
+            </Typography>
+          </Box>
+          <Link className="btn-nav" href={`/d/${token}/turni?mese=${addMonthsKey(monthKey, -1)}`}>‹</Link>
+          <Link className="btn-nav" href={`/d/${token}/turni?mese=${addMonthsKey(monthKey, 1)}`}>›</Link>
+        </Box>
+        <Box sx={{ mt: 1 }}>
+          <Chip label={`Ore lavorate questo mese: ${formatHours(total)}h`} color="info" size="small" />
+        </Box>
       </div>
 
-      <div className="mbody stack">
-        {myShifts.length === 0 && <p className="muted center">Nessun turno assegnato per questo mese.</p>}
-
-        {myShifts.map((s) => {
-          // colleghi presenti nello stesso giorno
-          const colleagues = allShifts
-            .filter((x) => x.date === s.date && x.secretaryId !== sec.id)
-            .map((x) => `${nameById.get(x.secretaryId)} ${x.start}–${x.end}`);
-          return (
-            <div key={s.id} className="card pad">
-              <div className="row">
-                <div className="date" style={{ width: 54 }}>
-                  <b style={{ fontSize: 20 }}>{dayNum(s.date)}</b>
-                  <span className="small muted">{dayShort(s.date)}</span>
-                </div>
-                <div className="col">
-                  <b>{s.start} – {s.end}</b>
-                  <div className="small muted">
-                    {formatHours(durationHours(s.start, s.end))} ore
-                    {colleagues.length ? ` · con ${colleagues.join(", ")}` : " · da sola"}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-
-        <p className="center small muted">I turni li imposta la manager. Qui li vedi sempre aggiornati.</p>
+      <div className="mbody">
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {myShifts.length === 0 && (
+            <Typography color="text.secondary" variant="body2" sx={{ textAlign: "center" }}>
+              Nessun turno assegnato per questo mese.
+            </Typography>
+          )}
+          {myShifts.map((s) => {
+            const colleagues = allShifts
+              .filter((x) => x.date === s.date && x.secretaryId !== sec.id)
+              .map((x) => `${nameById.get(x.secretaryId)} ${x.start}–${x.end}`);
+            return (
+              <Paper key={s.id} sx={{ p: 2 }}>
+                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
+                  <Box sx={{ width: 54, textAlign: "center", flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: "1.25rem", fontWeight: 800, lineHeight: 1 }}>{dayNum(s.date)}</Typography>
+                    <Typography variant="caption" color="text.secondary" sx={{ textTransform: "uppercase" }}>{dayShort(s.date)}</Typography>
+                  </Box>
+                  <Box>
+                    <Typography sx={{ fontWeight: 700 }}>{s.start} – {s.end}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatHours(durationHours(s.start, s.end))} ore
+                      {colleagues.length ? ` · con ${colleagues.join(", ")}` : " · da sola"}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+            );
+          })}
+          <Typography variant="caption" color="text.secondary" sx={{ textAlign: "center", mt: 1 }}>
+            I turni li imposta la manager. Qui li vedi sempre aggiornati.
+          </Typography>
+        </Box>
       </div>
 
       <div className="mtab">

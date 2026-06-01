@@ -1,16 +1,30 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ButtonLink";
 import { requireManager } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ManagerTop } from "@/components/ManagerTop";
 import { PrintButton } from "@/components/PrintButton";
 import { MultiWeekPoster, type MWPWeek } from "@/components/MultiWeekPoster";
-import { officeHours, ACTIVE_SEASON } from "@/lib/office";
+import { officeHours } from "@/lib/office";
 import { coverageGaps, hoursBySecretary } from "@/lib/coverage";
 import {
   monthDates, monthName, monthKeyOf, toISODate, addMonthsKey, addDays,
   mondayOf, weekDates, weekLabel, dayShort, dayNum,
   isWeekend, formatHours, durationHours,
 } from "@/lib/time";
+import Box from "@mui/material/Box";
+import Container from "@mui/material/Container";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import Alert from "@mui/material/Alert";
+import Divider from "@mui/material/Divider";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
 
 export default async function RiepilogoPage({
   searchParams,
@@ -38,9 +52,6 @@ export default async function RiepilogoPage({
   });
   const label = `${monthName(monthKey)} ${monthKey.slice(0, 4)}`;
 
-  // Settimane del mese per la griglia condivisibile.
-  // Prima settimana: lunedì che contiene il primo giorno del mese.
-  // Giorni fuori dal mese (es. aprile nella prima settimana di maggio) restano grigi.
   const posterWeeks: MWPWeek[] = [];
   let wStart = mondayOf(dates[0]);
   while (wStart <= dates[dates.length - 1]) {
@@ -50,19 +61,14 @@ export default async function RiepilogoPage({
     posterWeeks.push({
       label: weekLabel(wStart),
       dayHeaders: wd.map((iso) => ({
-        num: dayNum(iso),
-        name: dayShort(iso),
-        weekend: isWeekend(iso),
-        inMonth: monthDatesSet.has(iso),
+        num: dayNum(iso), name: dayShort(iso),
+        weekend: isWeekend(iso), inMonth: monthDatesSet.has(iso),
       })),
       secretaries: secretaries.map((s) => ({
-        id: s.id,
-        name: s.name,
-        color: s.color,
+        id: s.id, name: s.name, color: s.color,
         weekHours: formatHours(weeklyHours[s.id] ?? 0),
         days: wd.map((iso) =>
-          weekShifts
-            .filter((sh) => sh.date === iso && sh.secretaryId === s.id)
+          weekShifts.filter((sh) => sh.date === iso && sh.secretaryId === s.id)
             .sort((a, b) => a.start.localeCompare(b.start))
             .map((sh) => ({ start: sh.start, end: sh.end }))
         ),
@@ -80,67 +86,72 @@ export default async function RiepilogoPage({
   return (
     <>
       <ManagerTop active="riepilogo" />
-      <div className="wrap">
-        <div className="row" style={{ alignItems: "center", marginBottom: 14 }}>
-          <div className="col">
-            <div className="small muted">Riepilogo mensile</div>
-            <h1 style={{ margin: 0, textTransform: "capitalize" }}>{label}</h1>
-          </div>
-          <Link className="btn" href={`/manager/riepilogo?mese=${addMonthsKey(monthKey, -1)}`}>‹</Link>
-          <Link className="btn" href={`/manager/riepilogo?mese=${addMonthsKey(monthKey, 1)}`}>›</Link>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">Riepilogo mensile</Typography>
+            <Typography variant="h1" component="h1" sx={{ textTransform: "capitalize" }}>{label}</Typography>
+          </Box>
+          <ButtonLink href={`/manager/riepilogo?mese=${addMonthsKey(monthKey, -1)}`} variant="outlined" size="small">‹</ButtonLink>
+          <ButtonLink href={`/manager/riepilogo?mese=${addMonthsKey(monthKey, 1)}`}  variant="outlined" size="small">›</ButtonLink>
           <PrintButton />
-        </div>
+        </Box>
 
-        <div className="row">
-          <div className="col">
-            <div className="card pad">
-              <h3>Ore lavorate per segretaria</h3>
-              <table>
-                <thead>
-                  <tr><th>Segretaria</th><th>Contratto</th><th>Tetto/sett.</th><th>Ore mese</th></tr>
-                </thead>
-                <tbody>
-                  {secretaries.map((s) => {
-                    const done = monthlyHours[s.id] ?? 0;
-                    return (
-                      <tr key={s.id}>
-                        <td><span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span></td>
-                        <td>{s.contractType === "fisso" ? "Fisso" : "A chiamata"}</td>
-                        <td>{s.weeklyMax ? `${s.weeklyMax} h` : "—"}</td>
-                        <td><b>{formatHours(done)} h</b></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p className="small muted">Conteggio delle ore effettivamente assegnate nel mese. Il limite è settimanale (vedi colonna Tetto).</p>
-            </div>
-          </div>
+        <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap", mb: 3 }}>
+          {/* Ore per segretaria */}
+          <Paper sx={{ p: 2, flex: 1, minWidth: 360 }}>
+            <Typography variant="h3" sx={{ mb: 2 }}>Ore lavorate per segretaria</Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Segretaria</TableCell>
+                  <TableCell>Contratto</TableCell>
+                  <TableCell>Tetto/sett.</TableCell>
+                  <TableCell align="right">Ore mese</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {secretaries.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span>
+                    </TableCell>
+                    <TableCell>{s.contractType === "fisso" ? "Fisso" : "A chiamata"}</TableCell>
+                    <TableCell>{s.weeklyMax ? `${s.weeklyMax} h` : "—"}</TableCell>
+                    <TableCell align="right"><strong>{formatHours(monthlyHours[s.id] ?? 0)} h</strong></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
+              Ore effettivamente assegnate nel mese. Il limite è settimanale.
+            </Typography>
+          </Paper>
 
-          <div style={{ width: 300 }}>
-            <div className="card pad stack center">
-              <h3>Totali</h3>
-              <div><div className="kpi">{formatHours(totalHours)} h</div><div className="small muted">ore pianificate</div></div>
-              <hr className="soft" />
-              <div>
-                <div className="kpi" style={{ color: daysWithGaps.length ? "var(--red)" : "var(--green)" }}>
-                  {daysWithGaps.length}
-                </div>
-                <div className="small muted">giorni con fasce scoperte</div>
-              </div>
-              {daysWithGaps.length > 0 && (
-                <div className="note" style={{ textAlign: "left" }}>
-                  Risolvi i giorni {daysWithGaps.map((d) => dayNum(d)).join(", ")} prima di condividere.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          {/* Totali */}
+          <Paper sx={{ p: 2, width: 280, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, textAlign: "center" }}>
+            <Typography variant="h3">Totali</Typography>
+            <Box>
+              <Typography sx={{ fontSize: "1.75rem", fontWeight: 800 }}>{formatHours(totalHours)} h</Typography>
+              <Typography variant="body2" color="text.secondary">ore pianificate</Typography>
+            </Box>
+            <Divider flexItem />
+            <Box>
+              <Typography sx={{ fontSize: "1.75rem", fontWeight: 800, color: daysWithGaps.length ? "error.main" : "success.main" }}>
+                {daysWithGaps.length}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">giorni con fasce scoperte</Typography>
+            </Box>
+            {daysWithGaps.length > 0 && (
+              <Alert severity="warning" sx={{ width: "100%", textAlign: "left", fontSize: "0.8rem" }}>
+                Risolvi i giorni {daysWithGaps.map((d) => dayNum(d)).join(", ")} prima di condividere.
+              </Alert>
+            )}
+          </Paper>
+        </Box>
 
-        <div style={{ marginTop: 24 }}>
-          <MultiWeekPoster monthLabel={label} weeks={posterWeeks} />
-        </div>
-      </div>
+        <MultiWeekPoster monthLabel={label} weeks={posterWeeks} />
+      </Container>
     </>
   );
 }

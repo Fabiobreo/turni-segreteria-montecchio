@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ButtonLink";
 import { requireManager } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ManagerTop } from "@/components/ManagerTop";
@@ -10,6 +11,18 @@ import {
   mondayOf, weekDates, weekLabel, addDays, toISODate, dayShort, dayNum,
   isWeekend, monthKeyOf, formatHours, durationHours,
 } from "@/lib/time";
+import Box from "@mui/material/Box";
+import Container from "@mui/material/Container";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Alert from "@mui/material/Alert";
 
 export default async function WeekPage({
   searchParams,
@@ -34,22 +47,14 @@ export default async function WeekPage({
 
   const secById = new Map(secretaries.map((s) => [s.id, s]));
   const monthlyHours = hoursBySecretary(monthShifts);
-  const weeklyHours = hoursBySecretary(weekShifts);
+  const weeklyHours  = hoursBySecretary(weekShifts);
 
-  // dati per la griglia condivisibile (segretarie × 7 giorni)
-  const posterDayHeaders = days.map((iso) => ({
-    num: dayNum(iso),
-    name: dayShort(iso),
-    weekend: isWeekend(iso),
-  }));
+  const posterDayHeaders = days.map((iso) => ({ num: dayNum(iso), name: dayShort(iso), weekend: isWeekend(iso) }));
   const posterSecretaries = secretaries.map((s) => ({
-    id: s.id,
-    name: s.name,
-    color: s.color,
+    id: s.id, name: s.name, color: s.color,
     weekHours: formatHours(weeklyHours[s.id] ?? 0),
     days: days.map((iso) =>
-      weekShifts
-        .filter((sh) => sh.date === iso && sh.secretaryId === s.id)
+      weekShifts.filter((sh) => sh.date === iso && sh.secretaryId === s.id)
         .sort((a, b) => a.start.localeCompare(b.start))
         .map((sh) => ({ start: sh.start, end: sh.end }))
     ),
@@ -64,42 +69,32 @@ export default async function WeekPage({
     <>
       <ManagerTop
         active="settimana"
-        right={
-          recent > 0 ? (
-            <span className="tag warn">🔔 {recent} disponibilità aggiornate di recente</span>
-          ) : null
-        }
+        right={recent > 0 ? (
+          <Chip label={`🔔 ${recent} disponibilità aggiornate`} size="small" color="warning" />
+        ) : null}
       />
-      <div className="wrap" style={{ maxWidth: 1280 }}>
-        <div className="row" style={{ alignItems: "center", marginBottom: 14 }}>
-          <div className="col">
-            <div className="small muted">Costruzione turni · vista a fasce</div>
-            <h1 style={{ margin: 0 }}>{weekLabel(monday)}</h1>
-          </div>
-          <Link className="btn" href={`/manager?start=${addDays(monday, -7)}`}>
-            ‹ Settimana prec.
-          </Link>
-          <Link className="btn" href="/manager">
-            Oggi
-          </Link>
-          <Link className="btn" href={`/manager?start=${addDays(monday, 7)}`}>
-            Settimana succ. ›
-          </Link>
-        </div>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">Costruzione turni · vista a fasce</Typography>
+            <Typography variant="h1" component="h1">{weekLabel(monday)}</Typography>
+          </Box>
+          <ButtonLink href={`/manager?start=${addDays(monday, -7)}`} variant="outlined" size="small">‹ Settimana prec.</ButtonLink>
+          <ButtonLink href="/manager" variant="outlined" size="small">Oggi</ButtonLink>
+          <ButtonLink href={`/manager?start=${addDays(monday, 7)}`}  variant="outlined" size="small">Settimana succ. ›</ButtonLink>
+        </Box>
 
-        <div className="card pad">
-          <div className="row" style={{ marginBottom: 12, flexWrap: "wrap", gap: 10, alignItems: "center" }}>
-            <span className="small muted">Legenda:</span>
+        {/* Griglia a fasce */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Box sx={{ display: "flex", mb: 1.5, flexWrap: "wrap", gap: 1, alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary">Legenda:</Typography>
             {secretaries.map((s) => (
-              <span key={s.id} className={`chip ${s.color}`} style={{ display: "inline" }}>
-                {s.name}
-              </span>
+              <span key={s.id} className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span>
             ))}
-            <span className="sp" style={{ flex: 1 }} />
-            <span className="tag bad">▨ fascia scoperta</span>
-            <span className="tag info">colonne affiancate = raddoppio</span>
-          </div>
-
+            <Box sx={{ flex: 1 }} />
+            <Chip label="▨ fascia scoperta" color="error" size="small" variant="outlined" />
+            <Chip label="colonne affiancate = raddoppio" color="info" size="small" variant="outlined" />
+          </Box>
           <div className="weekgrid">
             <div className="hcell" />
             {days.map((iso) => (
@@ -108,67 +103,35 @@ export default async function WeekPage({
                 <span>{dayShort(iso)}</span>
               </Link>
             ))}
-
-            {/* asse orario */}
             <div className="timecol">
               {hourLabels().map((h) => (
-                <div key={h.label} className="tlabel" style={{ top: h.top }}>
-                  {h.label}
-                </div>
+                <div key={h.label} className="tlabel" style={{ top: h.top }}>{h.label}</div>
               ))}
             </div>
-
-            {/* colonne giorni */}
             {days.map((iso) => {
               const { open, close } = officeHours(iso);
               const dayShifts = weekShifts.filter((s) => s.date === iso);
               const gaps = coverageGaps(dayShifts, open, close);
               const { items, lanes } = assignLanes(dayShifts);
-              const hasGap = gaps.length > 0;
               return (
-                <Link
-                  key={iso}
-                  href={`/manager/giorno/${iso}`}
-                  className={`daybody${hasGap ? " gap-day" : ""}`}
-                  style={{ display: "block" }}
-                >
-                  {/* fasce fuori orario (weekend) */}
+                <Link key={iso} href={`/manager/giorno/${iso}`}
+                  className={`daybody${gaps.length ? " gap-day" : ""}`}
+                  style={{ display: "block" }}>
                   {topPx(open) > 0 && <div className="closed" style={{ top: 0, height: topPx(open) }} />}
-                  {topPx(close) < GRID_HEIGHT && (
-                    <div className="closed" style={{ top: topPx(close), height: GRID_HEIGHT - topPx(close) }} />
-                  )}
-                  {/* buchi di copertura */}
+                  {topPx(close) < GRID_HEIGHT && <div className="closed" style={{ top: topPx(close), height: GRID_HEIGHT - topPx(close) }} />}
                   {gaps.map((g, i) => (
-                    <div
-                      key={i}
-                      className="wgap"
-                      style={{ top: topPx(g.start), height: heightPx(g.start, g.end) }}
-                    >
-                      ▨ scoperto
-                      <br />
-                      {g.start}–{g.end}
+                    <div key={i} className="wgap" style={{ top: topPx(g.start), height: heightPx(g.start, g.end) }}>
+                      ▨ scoperto<br />{g.start}–{g.end}
                     </div>
                   ))}
-                  {/* turni */}
                   {items.map(({ shift, lane }) => {
                     const sec = secById.get(shift.secretaryId);
                     const widthPct = 100 / lanes;
                     return (
-                      <div
-                        key={shift.id}
-                        className={`wblock ${sec?.color ?? ""}`}
-                        style={{
-                          top: topPx(shift.start),
-                          height: heightPx(shift.start, shift.end),
-                          left: `calc(${lane * widthPct}% + 3px)`,
-                          width: `calc(${widthPct}% - 6px)`,
-                          right: "auto",
-                        }}
-                      >
-                        {sec?.name}
-                        <small>
-                          {shift.start}–{shift.end}
-                        </small>
+                      <div key={shift.id} className={`wblock ${sec?.color ?? ""}`}
+                        style={{ top: topPx(shift.start), height: heightPx(shift.start, shift.end),
+                          left: `calc(${lane * widthPct}% + 3px)`, width: `calc(${widthPct}% - 6px)`, right: "auto" }}>
+                        {sec?.name}<small>{shift.start}–{shift.end}</small>
                       </div>
                     );
                   })}
@@ -176,102 +139,81 @@ export default async function WeekPage({
               );
             })}
           </div>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+            💡 Tocca un giorno per aggiungere o modificare i turni. Le zone grigie sono fuori orario d&apos;ufficio.
+          </Typography>
+        </Paper>
 
-          <p className="small muted" style={{ marginTop: 12 }}>
-            💡 Tocca un giorno per aggiungere o modificare i turni. Le zone grigie sono fuori orario
-            d&apos;ufficio (weekend 09:00–19:30).
-          </p>
-        </div>
-
-        {/* ore + avvisi */}
-        <div className="row" style={{ marginTop: 16, flexWrap: "wrap" }}>
-          <div className="card pad col" style={{ minWidth: 380 }}>
-            <h3>Ore allocate (live)</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Segretaria</th>
-                  <th>Settimana</th>
-                  <th>Mese</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
+        {/* Ore + avvisi */}
+        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+          <Paper sx={{ p: 2, flex: 1, minWidth: 380 }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>Ore allocate (live)</Typography>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Segretaria</TableCell>
+                  <TableCell align="center">Settimana</TableCell>
+                  <TableCell align="right">Mese</TableCell>
+                  <TableCell />
+                </TableRow>
+              </TableHead>
+              <TableBody>
                 {secretaries.map((s) => {
                   const w = weeklyHours[s.id] ?? 0;
                   const m = monthlyHours[s.id] ?? 0;
                   const wMax = s.weeklyMax || 0;
-                  const wcls = wMax > 0 && w > wMax ? "bad" : wMax > 0 && w >= wMax ? "warn" : "ok";
-                  const label =
-                    wMax > 0 && w > wMax ? "oltre il tetto sett." : wMax > 0 && w >= wMax ? "al tetto sett." : "ok";
+                  const color = wMax > 0 && w > wMax ? "error" : wMax > 0 && w >= wMax ? "warning" : "success";
+                  const lbl   = wMax > 0 && w > wMax ? "oltre" : wMax > 0 && w >= wMax ? "al tetto" : "ok";
                   return (
-                    <tr key={s.id}>
-                      <td>
-                        <span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span>
-                      </td>
-                      <td>
-                        <span className={`tag ${wcls}`}>{formatHours(w)}{wMax ? ` / ${wMax}` : ""}</span>
-                      </td>
-                      <td className="small muted" title="ore lavorate questo mese">{formatHours(m)} h</td>
-                      <td className="small muted">{label}</td>
-                    </tr>
+                    <TableRow key={s.id}>
+                      <TableCell><span className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span></TableCell>
+                      <TableCell align="center">
+                        <Chip label={`${formatHours(w)}${wMax ? ` / ${wMax}` : ""}`} size="small" color={color} />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="caption" color="text.secondary">{formatHours(m)} h</Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="caption" color="text.secondary">{lbl}</Typography>
+                      </TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
-            <p className="small muted">
-              Settimana (allocate / tetto) in evidenza · Mese: ore già lavorate (solo conteggio). Tetti modificabili in{" "}
-              <Link href="/manager/segretarie">Segretarie</Link>.
-            </p>
-          </div>
+              </TableBody>
+            </Table>
+          </Paper>
 
-          <div className="card pad" style={{ width: 320 }}>
-            <h3>Avvisi settimana</h3>
-            <div className="stack">
+          <Paper sx={{ p: 2, width: 320 }}>
+            <Typography variant="h3" sx={{ mb: 1.5 }}>Avvisi settimana</Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {days.flatMap((iso) => {
                 const { open, close } = officeHours(iso);
-                const dayShifts = weekShifts.filter((s) => s.date === iso);
-                const gaps = coverageGaps(dayShifts, open, close);
-                const out: React.ReactNode[] = [];
-                if (dayShifts.length === 0) {
-                  out.push(
-                    <span key={`${iso}-empty`} className="tag bad">
-                      ⚠ {dayShort(iso)} {dayNum(iso)} · nessun turno
-                    </span>
-                  );
-                } else if (gaps.length > 0) {
-                  out.push(
-                    <span key={`${iso}-gap`} className="tag bad">
-                      ⚠ {dayShort(iso)} {dayNum(iso)} · scoperto {gaps[0].start}–{gaps[0].end}
-                      {gaps.length > 1 ? " …" : ""}
-                    </span>
-                  );
-                }
-                return out;
+                const ds = weekShifts.filter((s) => s.date === iso);
+                const gaps = coverageGaps(ds, open, close);
+                if (ds.length === 0) return [
+                  <Chip key={`${iso}-empty`} label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · nessun turno`} color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
+                ];
+                if (gaps.length > 0) return [
+                  <Chip key={`${iso}-gap`} label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · scoperto ${gaps[0].start}–${gaps[0].end}`} color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
+                ];
+                return [];
               })}
               {days.every((iso) => {
                 const { open, close } = officeHours(iso);
-                const dayShifts = weekShifts.filter((s) => s.date === iso);
-                return dayShifts.length > 0 && coverageGaps(dayShifts, open, close).length === 0;
-              }) && <span className="tag ok">✓ Tutti i giorni coperti</span>}
-            </div>
-            <p className="small muted" style={{ marginTop: 10 }}>
-              Totale turni settimana:{" "}
-              {formatHours(weekShifts.reduce((a, s) => a + durationHours(s.start, s.end), 0))} h
-            </p>
-          </div>
-        </div>
+                const ds = weekShifts.filter((s) => s.date === iso);
+                return ds.length > 0 && coverageGaps(ds, open, close).length === 0;
+              }) && <Chip label="✓ Tutti i giorni coperti" color="success" size="small" sx={{ alignSelf: "flex-start" }} />}
+            </Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
+              Totale turni settimana: {formatHours(weekShifts.reduce((a, s) => a + durationHours(s.start, s.end), 0))} h
+            </Typography>
+          </Paper>
+        </Box>
 
-        {/* griglia condivisibile (segretarie × giorni) */}
-        <div style={{ marginTop: 16 }}>
-          <WeekPoster
-            weekLabel={weekLabel(monday)}
-            dayHeaders={posterDayHeaders}
-            secretaries={posterSecretaries}
-            hasGaps={posterHasGaps}
-          />
-        </div>
-      </div>
+        <Box sx={{ mt: 2 }}>
+          <WeekPoster weekLabel={weekLabel(monday)} dayHeaders={posterDayHeaders} secretaries={posterSecretaries} hasGaps={posterHasGaps} />
+        </Box>
+      </Container>
     </>
   );
 }

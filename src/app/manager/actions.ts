@@ -48,6 +48,7 @@ export async function updateSecretary(input: {
   name: string;
   contractType: "fisso" | "a_chiamata";
   weeklyMax: number;
+  color: string;
 }) {
   await requireManager();
   if (!input.name.trim()) return { ok: false, error: "Il nome non può essere vuoto." };
@@ -57,6 +58,35 @@ export async function updateSecretary(input: {
       name: input.name.trim(),
       contractType: input.contractType,
       weeklyMax: Math.max(0, Math.round(input.weeklyMax)),
+      color: input.color,
+    },
+  });
+  revalidatePath("/manager", "layout");
+  return { ok: true };
+}
+
+export async function addSecretary(input: {
+  name: string;
+  contractType: "fisso" | "a_chiamata";
+  weeklyMax: number;
+  color: string;
+}) {
+  await requireManager();
+  if (!input.name.trim()) return { ok: false, error: "Il nome non può essere vuoto." };
+  const slug = input.name.trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // rimuove accenti
+    .replace(/[^a-z]/g, "").slice(0, 4) || "sec";
+  const rand = Math.random().toString(36).slice(2, 6);
+  const token = `${slug}-${rand}`;
+  const agg = await prisma.secretary.aggregate({ _max: { sort: true } });
+  await prisma.secretary.create({
+    data: {
+      name: input.name.trim(),
+      contractType: input.contractType,
+      weeklyMax: Math.max(0, Math.round(input.weeklyMax)),
+      color: input.color,
+      token,
+      sort: (agg._max.sort ?? 0) + 1,
     },
   });
   revalidatePath("/manager", "layout");

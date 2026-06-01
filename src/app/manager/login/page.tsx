@@ -1,5 +1,11 @@
 import { redirect } from "next/navigation";
 import { login, isManager } from "@/lib/auth";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import TextField from "@mui/material/TextField";
+import Button from "@mui/material/Button";
+import Alert from "@mui/material/Alert";
 
 async function loginAction(formData: FormData) {
   "use server";
@@ -18,19 +24,31 @@ export default async function LoginPage({
   const { errore } = await searchParams;
 
   return (
-    <div className="wrap" style={{ maxWidth: 420 }}>
-      <form className="card pad stack" style={{ marginTop: 60 }} action={loginAction}>
-        <div className="row" style={{ alignItems: "center" }}>
+    <Box sx={{ maxWidth: 400, mx: "auto", px: 3, pt: 8 }}>
+      <Paper sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1.5 }}>
           <div className="brand-dot" />
-          <h2 style={{ margin: 0 }}>Area manager</h2>
-        </div>
-        <p className="muted small">Inserisci la password per gestire i turni.</p>
-        {errore ? <div className="tag bad">Password errata</div> : null}
-        <input className="input" type="password" name="password" placeholder="Password" autoFocus required />
-        <button className="btn primary" type="submit">
-          Entra
-        </button>
-      </form>
-    </div>
+          <Typography variant="h2" component="h1">Area manager</Typography>
+        </Box>
+        <Typography color="text.secondary" variant="body2" sx={{ mb: 2.5 }}>
+          Inserisci la password per gestire i turni.
+        </Typography>
+
+        <form action={loginAction} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {errore && <Alert severity="error">Password errata. Riprova.</Alert>}
+          <TextField
+            type="password"
+            name="password"
+            placeholder="Password"
+            autoFocus
+            required
+            fullWidth
+          />
+          <Button type="submit" variant="contained" fullWidth>
+            Entra
+          </Button>
+        </form>
+      </Paper>
+    </Box>
   );
 }

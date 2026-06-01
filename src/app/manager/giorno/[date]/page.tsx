@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ButtonLink";
 import { requireManager } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ManagerTop } from "@/components/ManagerTop";
@@ -6,6 +7,10 @@ import { officeHours } from "@/lib/office";
 import { hoursBySecretary } from "@/lib/coverage";
 import { DayEditor } from "@/components/DayEditor";
 import { dayLong, dayNum, monthName, monthKeyOf, addDays, mondayOf, weekDates, weekLabel } from "@/lib/time";
+import Container from "@mui/material/Container";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
 
 export default async function DayPage({ params }: { params: Promise<{ date: string }> }) {
   await requireManager();
@@ -23,42 +28,34 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
   ]);
 
   const monthlyHours = hoursBySecretary(monthShifts);
-  const weeklyHours = hoursBySecretary(weekShifts);
+  const weeklyHours  = hoursBySecretary(weekShifts);
   const title = `${dayLong(date)} ${dayNum(date)} ${monthName(monthKey)} ${monthKey.slice(0, 4)}`;
 
   return (
     <>
       <ManagerTop />
-      <div className="wrap">
-        <div className="row" style={{ alignItems: "center", marginBottom: 6 }}>
-          <div className="col">
-            <div className="small muted">Costruzione giorno · ufficio {open}–{close}</div>
-            <h1 style={{ margin: 0, textTransform: "capitalize" }}>{title}</h1>
-          </div>
-          <Link className="btn" href={`/manager/giorno/${addDays(date, -1)}`}>
-            ‹ Giorno prec.
-          </Link>
-          <Link className="btn" href={`/manager/giorno/${addDays(date, 1)}`}>
-            Giorno succ. ›
-          </Link>
-        </div>
+      <Container maxWidth="xl" sx={{ py: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Costruzione giorno · ufficio {open}–{close}
+            </Typography>
+            <Typography variant="h1" component="h1" sx={{ textTransform: "capitalize" }}>{title}</Typography>
+          </Box>
+          <ButtonLink href={`/manager/giorno/${addDays(date, -1)}`} variant="outlined" size="small">‹ Giorno prec.</ButtonLink>
+          <ButtonLink href={`/manager/giorno/${addDays(date, 1)}`}  variant="outlined" size="small">Giorno succ. ›</ButtonLink>
+        </Box>
 
         <DayEditor
-          date={date}
-          open={open}
-          close={close}
+          date={date} open={open} close={close}
           weekLabel={weekLabel(mondayOf(date))}
-          secretaries={secretaries.map((s) => ({
-            id: s.id, name: s.name, color: s.color, weeklyMax: s.weeklyMax,
-          }))}
+          secretaries={secretaries.map((s) => ({ id: s.id, name: s.name, color: s.color, weeklyMax: s.weeklyMax }))}
           shifts={shifts.map((s) => ({ id: s.id, secretaryId: s.secretaryId, start: s.start, end: s.end }))}
-          availabilities={availabilities.map((a) => ({
-            secretaryId: a.secretaryId, status: a.status, start: a.start, end: a.end, note: a.note,
-          }))}
+          availabilities={availabilities.map((a) => ({ secretaryId: a.secretaryId, status: a.status, start: a.start, end: a.end, note: a.note }))}
           monthlyHours={monthlyHours}
           weeklyHours={weeklyHours}
         />
-      </div>
+      </Container>
     </>
   );
 }

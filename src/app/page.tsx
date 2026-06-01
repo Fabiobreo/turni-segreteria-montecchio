@@ -1,21 +1,24 @@
-import Link from "next/link";
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
 
 export default function Home() {
   return (
-    <div className="wrap" style={{ maxWidth: 560 }}>
-      <div className="card pad stack" style={{ marginTop: 40 }}>
-        <div className="row" style={{ alignItems: "center" }}>
+    <Box sx={{ maxWidth: 520, mx: "auto", px: 3, pt: 6 }}>
+      <Paper sx={{ p: 3 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
           <div className="brand-dot" />
-          <h1 style={{ margin: 0 }}>Gestione Turni — Segreteria</h1>
-        </div>
-        <p className="muted">
+          <Typography variant="h2" component="h1">Gestione Turni — Segreteria</Typography>
+        </Box>
+        <Typography color="text.secondary" sx={{ mb: 3 }}>
           Le segretarie accedono dal proprio link personale. La manager entra nell&apos;area
           completa con la password.
-        </p>
-        <Link className="btn primary" href="/manager">
+        </Typography>
+        <Button href="/manager" variant="contained" size="medium">
           Area manager →
-        </Link>
-      </div>
-    </div>
+        </Button>
+      </Paper>
+    </Box>
   );
 }
