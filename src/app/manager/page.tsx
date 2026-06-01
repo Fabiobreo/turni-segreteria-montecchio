@@ -38,7 +38,7 @@ export default async function WeekPage({
   const [secretaries, weekShifts, weekAvail, monthShifts, recent] = await Promise.all([
     prisma.secretary.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
     prisma.shift.findMany({ where: { date: { in: days } } }),
-    prisma.availability.findMany({ where: { date: { in: days } } }),
+    prisma.availability.findMany({ where: { date: { in: days } } }), // eslint-disable-line @typescript-eslint/no-unused-vars
     prisma.shift.findMany({ where: { date: { startsWith: monthKey } } }),
     prisma.availability.count({
       where: { updatedAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } },

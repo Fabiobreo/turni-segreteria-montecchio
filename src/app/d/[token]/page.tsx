@@ -21,8 +21,15 @@ export default async function AvailabilityPage({
   const availabilities = await prisma.availability.findMany({
     where: { secretaryId: sec.id, date: { in: dates } },
   });
-  const availMap: Record<string, { status: string; start: string | null; end: string | null; note: string | null }> = {};
-  for (const a of availabilities) availMap[a.date] = { status: a.status, start: a.start, end: a.end, note: a.note };
+  type Slot = { start: string; end: string };
+  const availMap: Record<string, { status: string; slots: Slot[]; note: string | null }> = {};
+  for (const a of availabilities) {
+    availMap[a.date] = {
+      status: a.status,
+      slots: a.slots ? (JSON.parse(a.slots) as Slot[]) : [],
+      note: a.note,
+    };
+  }
 
   const days = dates.map((iso) => {
     const { open, close } = officeHours(iso);
@@ -34,6 +41,7 @@ export default async function AvailabilityPage({
       key={monthKey}
       token={token}
       name={sec.name}
+      secColor={sec.color}
       monthKey={monthKey}
       monthLabel={`${monthName(monthKey)} ${monthKey.slice(0, 4)}`}
       days={days}

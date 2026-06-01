@@ -1,12 +1,9 @@
 // Schema dati — Gestione Turni Segreteria
-// Dev: SQLite. Per il deploy si cambia provider in "postgresql".
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// DEV: ripristina provider = "sqlite" e url = env("DATABASE_URL") solo
-// PROD: provider = "postgresql" con entrambe le URL Neon
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
@@ -33,8 +30,7 @@ model Availability {
   secretaryId String
   date        String // YYYY-MM-DD
   status      String // "disponibile" | "parziale" | "non_disponibile"
-  start       String? // HH:MM (solo se parziale)
-  end         String? // HH:MM (solo se parziale)
+  slots       String? // JSON: [{"start":"HH:MM","end":"HH:MM"}, ...] — solo se parziale
   note        String?
   updatedAt   DateTime @updatedAt
 

@@ -69,28 +69,32 @@ export function MultiWeekPoster({ monthLabel, weeks }: { monthLabel: string; wee
         </Button>
       </Box>
 
-      {/* selettore settimane */}
+      {/* selettore settimane — max 4 per volta */}
       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center", mb: 2, p: 1.5, bgcolor: "action.hover", borderRadius: 2 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <Typography variant="caption" color="text.secondary">Da:</Typography>
-          <ToggleButtonGroup size="small" exclusive value={startIdx} onChange={(_, v) => v !== null && pickStart(v)}>
-            {weeks.map((_, i) => (
-              <ToggleButton key={i} value={i} sx={{ fontSize: "0.75rem", px: 1.25, py: 0.5 }}>
-                Sett.&nbsp;{i + 1}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
-        </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <Typography variant="caption" color="text.secondary">Settimane:</Typography>
-          <ToggleButtonGroup size="small" exclusive value={count} onChange={(_, v) => v !== null && startIdx + v <= weeks.length && setCount(v)}>
-            {[1, 2, 3, 4].map((n) => (
-              <ToggleButton key={n} value={n} disabled={startIdx + n > weeks.length} sx={{ fontSize: "0.75rem", px: 1.25, py: 0.5 }}>
+          <ToggleButtonGroup size="small" exclusive value={count}
+            onChange={(_, v) => { if (v === null) return; const maxStart = weeks.length - v; if (startIdx > maxStart) setStartIdx(maxStart); setCount(v); }}>
+            {Array.from({ length: weeks.length }, (_, i) => i + 1).map((n) => (
+              <ToggleButton key={n} value={n} sx={{ fontSize: "0.75rem", px: 1.25, py: 0.5 }}>
                 {n}
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
         </Box>
+        {/* "Da:" compare solo se ci sono più finestre disponibili per il count scelto */}
+        {weeks.length - count > 0 && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="caption" color="text.secondary">Da:</Typography>
+            <ToggleButtonGroup size="small" exclusive value={startIdx} onChange={(_, v) => v !== null && pickStart(v)}>
+              {Array.from({ length: weeks.length - count + 1 }, (_, i) => (
+                <ToggleButton key={i} value={i} sx={{ fontSize: "0.75rem", px: 1.25, py: 0.5 }}>
+                  Sett.&nbsp;{i + 1}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
+        )}
         <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
           {displayed[0]?.label}{displayed.length > 1 ? ` → ${displayed[displayed.length - 1]?.label}` : ""}
         </Typography>
@@ -126,7 +130,6 @@ export function MultiWeekPoster({ monthLabel, weeks }: { monthLabel: string; wee
                     <td>
                       <div className={`pg-name ${s.color}`}>
                         <span>{s.name}</span>
-                        <span className="h">{s.weekHours}h</span>
                       </div>
                     </td>
                     {s.days.map((shifts, i) => (
@@ -148,7 +151,6 @@ export function MultiWeekPoster({ monthLabel, weeks }: { monthLabel: string; wee
         <div className="poster-foot">
           <span>Lun–Ven 08:00–20:30 · Sab–Dom 09:00–19:30</span>
           {displayed.some((w) => w.hasGaps) && <span className="gapnote">⚠ Alcune fasce ancora scoperte</span>}
-          <span style={{ marginLeft: "auto" }}>Generato con Gestione Turni</span>
         </div>
       </div>
 

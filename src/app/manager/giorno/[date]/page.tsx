@@ -51,7 +51,7 @@ export default async function DayPage({ params }: { params: Promise<{ date: stri
           weekLabel={weekLabel(mondayOf(date))}
           secretaries={secretaries.map((s) => ({ id: s.id, name: s.name, color: s.color, weeklyMax: s.weeklyMax }))}
           shifts={shifts.map((s) => ({ id: s.id, secretaryId: s.secretaryId, start: s.start, end: s.end }))}
-          availabilities={availabilities.map((a) => ({ secretaryId: a.secretaryId, status: a.status, start: a.start, end: a.end, note: a.note }))}
+          availabilities={availabilities.map((a) => ({ secretaryId: a.secretaryId, status: a.status, slots: a.slots, note: a.note }))}
           monthlyHours={monthlyHours}
           weeklyHours={weeklyHours}
         />

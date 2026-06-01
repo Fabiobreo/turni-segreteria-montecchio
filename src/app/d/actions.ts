@@ -14,23 +14,27 @@ export async function setAvailability(input: {
   token: string;
   date: string;
   status: "disponibile" | "parziale" | "non_disponibile";
-  start?: string | null;
-  end?: string | null;
+  slots?: string | null; // JSON: [{start,end}, ...]
   note?: string | null;
 }) {
   const sec = await secretaryByToken(input.token);
 
-  const isPartial = input.status === "parziale";
-  const start = isPartial ? input.start ?? null : null;
-  const end = isPartial ? input.end ?? null : null;
-  if (isPartial && start && end && toMinutes(end) <= toMinutes(start)) {
-    return { ok: false, error: "L'orario di fine deve essere dopo l'inizio." };
+  const slots = input.status === "parziale" ? (input.slots ?? null) : null;
+
+  // Valida ogni fascia: fine deve essere dopo inizio
+  if (slots) {
+    const parsed: { start: string; end: string }[] = JSON.parse(slots);
+    for (const s of parsed) {
+      if (toMinutes(s.end) <= toMinutes(s.start)) {
+        return { ok: false, error: "Ogni fascia deve avere orario fine dopo inizio." };
+      }
+    }
   }
 
   await prisma.availability.upsert({
     where: { secretaryId_date: { secretaryId: sec.id, date: input.date } },
-    update: { status: input.status, start, end, note: input.note ?? null },
-    create: { secretaryId: sec.id, date: input.date, status: input.status, start, end, note: input.note ?? null },
+    update: { status: input.status, slots, note: input.note ?? null },
+    create: { secretaryId: sec.id, date: input.date, status: input.status, slots, note: input.note ?? null },
   });
   revalidatePath(`/d/${input.token}`);
   return { ok: true };
@@ -39,14 +43,14 @@ export async function setAvailability(input: {
 export async function setManyAvailability(input: {
   token: string;
   dates: string[];
-  status: "disponibile" | "parziale" | "non_disponibile";
+  status: "disponibile" | "non_disponibile";
 }) {
   const sec = await secretaryByToken(input.token);
   await prisma.$transaction(
     input.dates.map((date) =>
       prisma.availability.upsert({
         where: { secretaryId_date: { secretaryId: sec.id, date } },
-        update: { status: input.status, start: null, end: null },
+        update: { status: input.status, slots: null },
         create: { secretaryId: sec.id, date, status: input.status },
       })
     )

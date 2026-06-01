@@ -4,7 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveShift, deleteShift } from "@/app/manager/actions";
 import { toMinutes, durationHours, formatHours } from "@/lib/time";
-import { coverageGaps, maxConcurrent, assignLanes } from "@/lib/coverage";
+import { coverageGaps, maxConcurrent } from "@/lib/coverage";
+import { DayGantt } from "./DayGantt";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -22,7 +23,7 @@ import TableRow from "@mui/material/TableRow";
 
 type Sec   = { id: string; name: string; color: string; weeklyMax: number };
 type Shift = { id: string; secretaryId: string; start: string; end: string };
-type Avail = { secretaryId: string; status: string; start: string | null; end: string | null; note: string | null };
+type Avail = { secretaryId: string; status: string; slots: string | null; note: string | null };
 type RangeStatus = "si" | "no" | "non_indicata";
 
 export function DayEditor({
@@ -41,19 +42,17 @@ export function DayEditor({
   const availBySec = new Map(availabilities.map((a) => [a.secretaryId, a]));
   const gaps       = coverageGaps(shifts, open, close);
   const overCap    = maxConcurrent(shifts) > 2;
-  const { items, lanes } = assignLanes(shifts);
-  const trackH     = Math.max(34, lanes * 34);
-  const oMin = toMinutes(open);
-  const span = toMinutes(close) - oMin;
-  const pct  = (t: string) => ((toMinutes(t) - oMin) / span) * 100;
 
   function availForRange(secId: string, start: string, end: string): RangeStatus {
     const a = availBySec.get(secId);
     if (!a) return "non_indicata";
     if (a.status === "disponibile") return "si";
     if (a.status === "non_disponibile") return "no";
-    if (a.status === "parziale" && a.start && a.end)
-      return toMinutes(a.start) <= toMinutes(start) && toMinutes(end) <= toMinutes(a.end) ? "si" : "no";
+    if (a.status === "parziale" && a.slots) {
+      const slots: { start: string; end: string }[] = JSON.parse(a.slots);
+      const covers = slots.some((s) => toMinutes(s.start) <= toMinutes(start) && toMinutes(end) <= toMinutes(s.end));
+      return covers ? "si" : "no";
+    }
     return "non_indicata";
   }
 
@@ -73,6 +72,15 @@ export function DayEditor({
   }
   function remove(id: string) {
     startTransition(async () => { await deleteShift(id); router.refresh(); });
+  }
+  // salvataggio diretto da drag sulla griglia (senza aprire il form)
+  function saveDirect(id: string | null, secretaryId: string, start: string, end: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await saveShift({ id: id ?? undefined, date, secretaryId, start, end });
+      if (!res.ok) { setError(res.error ?? "Errore"); return; }
+      router.refresh();
+    });
   }
 
   const availWarn = form
@@ -96,25 +104,18 @@ export function DayEditor({
             {overCap && <Chip label="⚠ più di 2 persone" color="error" size="small" />}
           </Box>
 
-          {/* timeline */}
-          <div className="timeline">
-            <div className="track" style={{ height: trackH }}>
-              {gaps.map((g, i) => (
-                <div key={i} className="hole" style={{ left: `${pct(g.start)}%`, width: `${pct(g.end) - pct(g.start)}%` }} />
-              ))}
-              {items.map(({ shift, lane }) => {
-                const sec = secById.get(shift.secretaryId);
-                return (
-                  <div key={shift.id} className={`block ${sec?.color ?? ""}`}
-                    title={`${sec?.name} ${shift.start}–${shift.end}`}
-                    style={{ left: `${pct(shift.start)}%`, width: `${pct(shift.end) - pct(shift.start)}%`, top: lane * 34, height: 30 }}>
-                    {sec?.name} {shift.start}–{shift.end}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="scale"><span>{open}</span><span>{close}</span></div>
-          </div>
+          {/* griglia per segretaria (crea/sposta/ridimensiona con il drag) */}
+          <DayGantt
+            open={open} close={close}
+            secretaries={secretaries}
+            shifts={shifts}
+            availabilities={availabilities}
+            gaps={gaps}
+            onCreate={(secId, start, end) => saveDirect(null, secId, start, end)}
+            onUpdate={(id, secId, start, end) => saveDirect(id, secId, start, end)}
+            onSelect={(s) => startEdit(s)}
+            onDelete={(id) => remove(id)}
+          />
 
           {/* fasce scoperte con chi è disponibile */}
           {gaps.length > 0 && (
@@ -236,7 +237,11 @@ export function DayEditor({
                 let chip = <Chip label="—" size="small" />;
                 let detail = "non indicata";
                 if (a?.status === "disponibile") { chip = <Chip label="Sì" size="small" color="success" />; detail = "tutto il giorno"; }
-                else if (a?.status === "parziale") { chip = <Chip label="Parz." size="small" color="warning" />; detail = `${a.start}–${a.end}`; }
+                else if (a?.status === "parziale") {
+                  chip = <Chip label="Parz." size="small" color="warning" />;
+                  const slots: { start: string; end: string }[] = a.slots ? JSON.parse(a.slots) : [];
+                  detail = slots.map((s) => `${s.start}–${s.end}`).join(", ") || "orari non specificati";
+                }
                 else if (a?.status === "non_disponibile") { chip = <Chip label="No" size="small" color="error" />; detail = "non disponibile"; }
                 return (
                   <TableRow key={s.id}>

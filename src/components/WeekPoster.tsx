@@ -86,7 +86,6 @@ export function WeekPoster({
                 <td>
                   <div className={`pg-name ${s.color}`}>
                     <span>{s.name}</span>
-                    <span className="h">{s.weekHours}h</span>
                   </div>
                 </td>
                 {s.days.map((shifts, i) => (
@@ -105,7 +104,6 @@ export function WeekPoster({
         <div className="poster-foot">
           <span>Lun–Ven 08:00–20:30 · Sab–Dom 09:00–19:30</span>
           {hasGaps && <span className="gapnote">⚠ Fasce ancora scoperte</span>}
-          <span style={{ marginLeft: "auto" }}>Generato con Gestione Turni</span>
         </div>
       </div>
 

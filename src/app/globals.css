@@ -83,28 +83,7 @@
   background:repeating-linear-gradient(45deg,#fde2e0,#fde2e0 6px,#fff 6px,#fff 12px);
   color:var(--red); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; text-align:center; text-decoration:none; }
 
-/* ===== Layout mobile (segretarie) ===== */
-.mobile { max-width:460px; margin:0 auto; min-height:100vh; background:var(--bg); }
-.mhead { position:sticky; top:0; z-index:5; background:var(--card); border-bottom:1px solid var(--line); padding:14px 16px; }
-.mbody { padding:14px 16px 90px; }
-.mtab { position:fixed; bottom:0; left:0; right:0; max-width:460px; margin:0 auto; background:#fff; border-top:1px solid var(--line); display:flex; }
-.mtab a { flex:1; text-align:center; padding:10px 0; font-size:12px; color:var(--muted); text-decoration:none; }
-.mtab a.active { color:var(--brand); font-weight:700; }
-.mtab .ic { display:block; font-size:18px; }
-.mhead .btn-nav { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); background:#fff; color:var(--ink); padding:5px 10px; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; text-decoration:none; }
-
-/* ===== Righe disponibilità (mobile) ===== */
-.dayrow { display:flex; align-items:center; gap:12px; padding:12px 14px; background:#fff; border:1px solid var(--line); border-radius:12px; }
-.dayrow .date { width:44px; text-align:center; flex-shrink:0; }
-.dayrow .date b { font-size:18px; display:block; }
-.dayrow .date span { font-size:11px; color:var(--muted); text-transform:uppercase; }
-.dayrow .info { flex:1; min-width:0; }
-.seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; }
-.seg button { border:0; background:#fff; padding:7px 10px; font-size:12px; font-weight:600; color:var(--muted); cursor:pointer; border-left:1px solid var(--line); font-family:inherit; }
-.seg button:first-child { border-left:0; }
-.seg button.on-ok   { background:var(--green); color:#fff; }
-.seg button.on-part { background:var(--amber); color:#fff; }
-.seg button.on-no   { background:var(--red);   color:#fff; }
+/* Layout mobile e righe disponibilità: rimpiazzati da MUI in AvailabilityEditor e turni/page */
 
 /* ===== Poster (export immagine) ===== */
 .poster { background:#ffffff; border-radius:16px; padding:22px; border:1px solid var(--line); }

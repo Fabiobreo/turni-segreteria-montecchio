@@ -5,16 +5,43 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setAvailability, setManyAvailability, clearMonth } from "@/app/d/actions";
 import { dayShort, dayNum, isWeekend, addMonthsKey } from "@/lib/time";
+import { COLORS } from "@/lib/colors";
 
+import Box from "@mui/material/Box";
+import Paper from "@mui/material/Paper";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import Chip from "@mui/material/Chip";
+import Alert from "@mui/material/Alert";
+import LinearProgress from "@mui/material/LinearProgress";
+import Stack from "@mui/material/Stack";
+import Collapse from "@mui/material/Collapse";
+import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import BottomNavigation from "@mui/material/BottomNavigation";
+import BottomNavigationAction from "@mui/material/BottomNavigationAction";
+import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
+import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
+import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
+import EventNoteIcon from "@mui/icons-material/EventNote";
+import AddIcon from "@mui/icons-material/Add";
+import CloseIcon from "@mui/icons-material/Close";
+
+export type Slot  = { start: string; end: string };
 type Status = "disponibile" | "parziale" | "non_disponibile" | "none";
-type Entry = { status: string; start: string | null; end: string | null; note: string | null };
-type Day = { iso: string; open: string; close: string };
+type Entry  = { status: string; slots: Slot[]; note: string | null };
+type Day    = { iso: string; open: string; close: string };
 
 export function AvailabilityEditor({
-  token, name, monthKey, monthLabel, days, initial,
+  token, name, secColor, monthKey, monthLabel, days, initial,
 }: {
   token: string;
   name: string;
+  secColor: string;
   monthKey: string;
   monthLabel: string;
   days: Day[];
@@ -25,35 +52,74 @@ export function AvailabilityEditor({
   const [data, setData] = useState<Record<string, Entry>>(initial);
 
   const statusOf = (iso: string): Status => (data[iso]?.status as Status) ?? "none";
-  const setLocal = (iso: string, e: Entry | undefined) =>
+
+  function setLocal(iso: string, e: Entry | undefined) {
     setData((prev) => {
       const next = { ...prev };
-      if (e) next[iso] = e;
-      else delete next[iso];
+      if (e) next[iso] = e; else delete next[iso];
       return next;
     });
+  }
 
+  // Sceglie uno stato per un giorno; se parziale, inizializza con una fascia di default
   function chooseStatus(day: Day, status: "disponibile" | "parziale" | "non_disponibile") {
     const prev = data[day.iso];
     const entry: Entry =
       status === "parziale"
-        ? { status, start: prev?.start ?? day.open, end: prev?.end ?? day.close, note: prev?.note ?? null }
-        : { status, start: null, end: null, note: prev?.note ?? null };
+        ? { status, slots: prev?.slots?.length ? prev.slots : [{ start: day.open, end: day.close }], note: prev?.note ?? null }
+        : { status, slots: [], note: prev?.note ?? null };
     setLocal(day.iso, entry);
     startTransition(async () => {
-      await setAvailability({ token, date: day.iso, status, start: entry.start, end: entry.end, note: entry.note });
+      await setAvailability({ token, date: day.iso, status, slots: status === "parziale" ? JSON.stringify(entry.slots) : null, note: entry.note });
     });
   }
 
-  function savePartial(iso: string, patch: Partial<Entry>) {
-    const cur = data[iso];
-    if (!cur) return;
-    const entry = { ...cur, ...patch };
-    setLocal(iso, entry);
+  // Aggiorna una fascia (onChange → aggiorna stato locale; onBlur → salva)
+  function changeSlotField(iso: string, idx: number, field: "start" | "end", val: string) {
+    const entry = data[iso];
+    if (!entry) return;
+    const slots = entry.slots.map((s, i) => i === idx ? { ...s, [field]: val } : s);
+    setLocal(iso, { ...entry, slots });
+  }
+
+  function persistSlots(iso: string) {
+    // Legge data dalla closure — sicuro perché onBlur è un evento separato
+    // da onChange, quindi React ha già committato l'aggiornamento di stato.
+    const entry = data[iso];
+    if (!entry) return;
     startTransition(async () => {
-      await setAvailability({
-        token, date: iso, status: "parziale", start: entry.start, end: entry.end, note: entry.note,
-      });
+      await setAvailability({ token, date: iso, status: "parziale", slots: JSON.stringify(entry.slots), note: entry.note });
+    });
+  }
+
+  function addSlot(iso: string, day: Day) {
+    const entry = data[iso];
+    if (!entry) return;
+    const last = entry.slots[entry.slots.length - 1];
+    const newSlot: Slot = last ? { start: last.end, end: day.close } : { start: day.open, end: day.close };
+    const slots = [...entry.slots, newSlot];
+    setLocal(iso, { ...entry, slots });
+    startTransition(async () => {
+      await setAvailability({ token, date: iso, status: "parziale", slots: JSON.stringify(slots), note: entry.note });
+    });
+  }
+
+  function removeSlot(iso: string, idx: number) {
+    const entry = data[iso];
+    if (!entry || entry.slots.length <= 1) return;
+    const slots = entry.slots.filter((_, i) => i !== idx);
+    setLocal(iso, { ...entry, slots });
+    startTransition(async () => {
+      await setAvailability({ token, date: iso, status: "parziale", slots: JSON.stringify(slots), note: entry.note });
+    });
+  }
+
+  function saveNote(iso: string, note: string | null) {
+    const entry = data[iso];
+    if (!entry) return;
+    setLocal(iso, { ...entry, note });
+    startTransition(async () => {
+      await setAvailability({ token, date: iso, status: "parziale", slots: JSON.stringify(entry.slots), note });
     });
   }
 
@@ -61,7 +127,7 @@ export function AvailabilityEditor({
     const dates = days.map((d) => d.iso).filter(filter);
     setData((prev) => {
       const next = { ...prev };
-      for (const iso of dates) next[iso] = { status, start: null, end: null, note: next[iso]?.note ?? null };
+      for (const iso of dates) next[iso] = { status, slots: [], note: next[iso]?.note ?? null };
       return next;
     });
     startTransition(async () => {
@@ -80,91 +146,209 @@ export function AvailabilityEditor({
   }
 
   const set = days.filter((d) => statusOf(d.iso) !== "none").length;
+  const progress = days.length > 0 ? (set / days.length) * 100 : 0;
+  const colorHex = COLORS.find((c) => c.key === secColor)?.hex ?? "#2f6df6";
 
   return (
-    <div className="mobile">
-      <div className="mhead">
-        <div className="row" style={{ alignItems: "center" }}>
-          <div className="col">
-            <div className="small muted">Ciao {name} 👋</div>
-            <h2 style={{ margin: 0, textTransform: "capitalize" }}>Disponibilità · {monthLabel}</h2>
-          </div>
-          <Link className="btn sm" href={`/d/${token}?mese=${addMonthsKey(monthKey, -1)}`}>‹</Link>
-          <Link className="btn sm" href={`/d/${token}?mese=${addMonthsKey(monthKey, 1)}`}>›</Link>
-        </div>
-        <div className="note" style={{ marginTop: 10 }}>
-          ⏰ Inserisci preferibilmente entro il <b>25 del mese precedente</b>. Puoi modificare quando vuoi.
-        </div>
-      </div>
+    <Box sx={{ maxWidth: 460, mx: "auto", minHeight: "100vh", bgcolor: "background.default" }}>
 
-      <div className="mbody stack">
-        <div className="card pad">
-          <div className="small muted" style={{ marginBottom: 8 }}>Azioni rapide</div>
-          <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-            <button className="btn sm" disabled={pending} onClick={() => bulk((iso) => !isWeekend(iso), "disponibile")}>
-              Lun–Ven disponibili
-            </button>
-            <button className="btn sm" disabled={pending} onClick={() => bulk((iso) => isWeekend(iso), "non_disponibile")}>
+      {/* ── HEADER STICKY ── */}
+      <Box sx={{ position: "sticky", top: 0, zIndex: 10, bgcolor: "background.paper", borderBottom: "1px solid", borderColor: "divider" }}>
+        <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box sx={{ flex: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
+                <Chip label={name} size="small" sx={{ bgcolor: colorHex, color: "#fff", fontWeight: 700 }} />
+                <Typography variant="caption" color="text.secondary">👋 Ciao!</Typography>
+              </Box>
+              <Typography variant="h2" sx={{ textTransform: "capitalize" }}>{monthLabel}</Typography>
+            </Box>
+            <IconButton component={Link} href={`/d/${token}?mese=${addMonthsKey(monthKey, -1)}`} size="small">
+              <ChevronLeftIcon />
+            </IconButton>
+            <IconButton component={Link} href={`/d/${token}?mese=${addMonthsKey(monthKey, 1)}`} size="small">
+              <ChevronRightIcon />
+            </IconButton>
+          </Box>
+        </Box>
+        <Alert severity="info" sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0, fontSize: "0.8rem", py: 0.5 }}>
+          Inserisci preferibilmente entro il <strong>25 del mese precedente</strong>. Puoi sempre modificare.
+        </Alert>
+      </Box>
+
+      {/* ── CORPO ── */}
+      <Box sx={{ px: 2, pt: 2, pb: 12 }}>
+
+        {/* Azioni rapide */}
+        <Paper sx={{ p: 1.5, mb: 2 }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+            Azioni rapide
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            <Button size="small" variant="outlined" disabled={pending} onClick={() => bulk(() => true, "disponibile")}>
+              Tutti disponibili
+            </Button>
+            <Button size="small" variant="outlined" disabled={pending} onClick={() => bulk((iso) => !isWeekend(iso), "disponibile")}>
+              Lun–Ven disp.
+            </Button>
+            <Button size="small" variant="outlined" disabled={pending} onClick={() => bulk((iso) => isWeekend(iso), "non_disponibile")}>
               Weekend non disp.
-            </button>
-            <button className="btn sm ghost" disabled={pending} onClick={azzera}>Azzera mese</button>
-          </div>
-        </div>
+            </Button>
+            <Button size="small" variant="text" color="error" disabled={pending} onClick={azzera}>Azzera</Button>
+          </Box>
+        </Paper>
 
-        <div className="small muted">
-          Tocca per ogni giorno: <span className="tag ok">Sì</span> <span className="tag warn">Parz.</span>{" "}
-          <span className="tag bad">No</span>
-        </div>
+        {/* Barra progresso */}
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+            <Typography variant="caption" color="text.secondary">
+              {set} di {days.length} giorni compilati
+            </Typography>
+            {set === days.length
+              ? <Typography variant="caption" color="success.main" sx={{ fontWeight: 700 }}>✓ Mese completo!</Typography>
+              : <Typography variant="caption" color="text.secondary">{days.length - set} mancanti</Typography>
+            }
+          </Box>
+          <LinearProgress variant="determinate" value={progress}
+            color={set === days.length ? "success" : "primary"}
+            sx={{ borderRadius: 1, height: 6 }} />
+        </Box>
 
-        {days.map((day) => {
-          const st = statusOf(day.iso);
-          const entry = data[day.iso];
-          const we = isWeekend(day.iso);
-          return (
-            <div key={day.iso} className="dayrow" style={st === "parziale" ? { display: "block" } : undefined}>
-              <div className="row" style={{ alignItems: "center" }}>
-                <div className="date">
-                  <b style={we ? { color: "var(--brand)" } : undefined}>{dayNum(day.iso)}</b>
-                  <span>{dayShort(day.iso)}</span>
-                </div>
-                <div className="info">
-                  <div className="seg">
-                    <button className={st === "disponibile" ? "on-ok" : ""} onClick={() => chooseStatus(day, "disponibile")}>Sì</button>
-                    <button className={st === "parziale" ? "on-part" : ""} onClick={() => chooseStatus(day, "parziale")}>Parz.</button>
-                    <button className={st === "non_disponibile" ? "on-no" : ""} onClick={() => chooseStatus(day, "non_disponibile")}>No</button>
-                  </div>
-                </div>
-              </div>
+        {/* Lista giorni */}
+        <Stack spacing={0.75}>
+          {days.map((day) => {
+            const st    = statusOf(day.iso);
+            const entry = data[day.iso];
+            const we    = isWeekend(day.iso);
+            const leftClr =
+              st === "disponibile"     ? "#138a4a" :
+              st === "non_disponibile" ? "#c0392b" :
+              st === "parziale"        ? "#b7791f" : "#e5e7eb";
 
-              {st === "parziale" && (
-                <>
-                  <div className="row" style={{ marginTop: 10, gap: 8, alignItems: "center" }}>
-                    <span className="small muted">Dalle</span>
-                    <input className="input" style={{ width: 110 }} type="time" defaultValue={entry?.start ?? day.open}
-                      onBlur={(e) => savePartial(day.iso, { start: e.target.value })} />
-                    <span className="small muted">alle</span>
-                    <input className="input" style={{ width: 110 }} type="time" defaultValue={entry?.end ?? day.close}
-                      onBlur={(e) => savePartial(day.iso, { end: e.target.value })} />
-                  </div>
-                  <input className="input" style={{ width: "100%", marginTop: 8 }} placeholder="📝 Nota (facoltativa)"
-                    defaultValue={entry?.note ?? ""} onBlur={(e) => savePartial(day.iso, { note: e.target.value || null })} />
-                </>
-              )}
-            </div>
-          );
-        })}
+            return (
+              <Box key={day.iso} sx={{
+                bgcolor: "background.paper",
+                border: "1px solid #e5e7eb",
+                borderLeftWidth: 4,
+                borderLeftColor: leftClr,
+                borderRadius: "0 12px 12px 0",
+                overflow: "hidden",
+                transition: "border-left-color .2s",
+              }}>
+                {/* Riga data + toggle */}
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 1.5, py: 1.25 }}>
+                  <Box sx={{ width: 42, textAlign: "center", flexShrink: 0 }}>
+                    <Typography sx={{ fontSize: "1.25rem", fontWeight: 800, lineHeight: 1, color: we ? "primary.main" : "text.primary" }}>
+                      {dayNum(day.iso)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ textTransform: "uppercase", fontWeight: we ? 700 : 400, color: we ? "primary.main" : "text.secondary" }}>
+                      {dayShort(day.iso)}
+                    </Typography>
+                  </Box>
 
-        <div className="card pad center">
-          <div className="small muted">Stato mese</div>
-          <div><b>{set} giorni</b> impostati · {days.length - set} da compilare</div>
-          <div className="small muted" style={{ marginTop: 4 }}>{pending ? "Salvataggio…" : "✓ Salvato automaticamente"}</div>
-        </div>
-      </div>
+                  <ToggleButtonGroup
+                    value={st === "none" ? null : st}
+                    exclusive
+                    size="small"
+                    onChange={(_, v) => { if (v) chooseStatus(day, v); }}
+                    sx={{ flex: 1, "& .MuiToggleButton-root": { flex: 1, py: 0.5, fontSize: "0.8rem", fontWeight: 600 } }}
+                  >
+                    <ToggleButton value="disponibile"     color="success">Sì</ToggleButton>
+                    <ToggleButton value="parziale"        color="warning">Parz.</ToggleButton>
+                    <ToggleButton value="non_disponibile" color="error">No</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
 
-      <div className="mtab">
-        <Link className="active" href={`/d/${token}`}><span className="ic">📅</span>Disponibilità</Link>
-        <Link href={`/d/${token}/turni`}><span className="ic">🗓️</span>I miei turni</Link>
-      </div>
-    </div>
+                {/* Espansione parziale — fasce orarie multiple */}
+                <Collapse in={st === "parziale"}>
+                  <Divider />
+                  <Box sx={{ px: 1.5, pb: 1.25, pt: 1 }}>
+
+                    {/* Lista fasce */}
+                    <Stack spacing={0.75}>
+                      {(entry?.slots ?? []).map((slot, idx) => (
+                        <Box key={idx} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                          <TextField
+                            type="time" size="small"
+                            value={slot.start}
+                            onChange={(e) => changeSlotField(day.iso, idx, "start", e.target.value)}
+                            onBlur={() => persistSlots(day.iso)}
+                            sx={{ width: 110 }}
+                          />
+                          <Typography variant="caption" color="text.secondary">–</Typography>
+                          <TextField
+                            type="time" size="small"
+                            value={slot.end}
+                            onChange={(e) => changeSlotField(day.iso, idx, "end", e.target.value)}
+                            onBlur={() => persistSlots(day.iso)}
+                            sx={{ width: 110 }}
+                          />
+                          <IconButton
+                            size="small"
+                            onClick={() => removeSlot(day.iso, idx)}
+                            disabled={entry?.slots?.length === 1}
+                            sx={{ color: "text.secondary", ml: "auto" }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      ))}
+                    </Stack>
+
+                    {/* Aggiungi fascia */}
+                    <Button
+                      size="small"
+                      variant="text"
+                      startIcon={<AddIcon />}
+                      onClick={() => addSlot(day.iso, day)}
+                      sx={{ mt: 0.75, fontSize: "0.8rem" }}
+                    >
+                      Aggiungi fascia
+                    </Button>
+
+                    {/* Nota */}
+                    <TextField
+                      placeholder="📝 Nota facoltativa"
+                      size="small"
+                      fullWidth
+                      defaultValue={entry?.note ?? ""}
+                      onBlur={(e) => saveNote(day.iso, e.target.value || null)}
+                      sx={{ mt: 1 }}
+                    />
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
+        </Stack>
+
+        {/* Stato salvataggio */}
+        <Box sx={{ mt: 2, textAlign: "center", py: 1.5 }}>
+          {pending
+            ? <Box sx={{ display: "flex", alignItems: "center", gap: 1, justifyContent: "center" }}>
+                <CircularProgress size={14} />
+                <Typography variant="caption" color="text.secondary">Salvataggio…</Typography>
+              </Box>
+            : <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>
+                ✓ Salvato automaticamente
+              </Typography>
+          }
+        </Box>
+      </Box>
+
+      {/* ── TAB BAR ── */}
+      <BottomNavigation value={0} sx={{
+        position: "fixed", bottom: 0,
+        left: "50%", transform: "translateX(-50%)",
+        width: "100%", maxWidth: 460,
+        borderTop: "1px solid #e5e7eb",
+        bgcolor: "background.paper",
+        zIndex: 10,
+      }}>
+        <BottomNavigationAction showLabel label="Disponibilità" icon={<CalendarMonthIcon />} />
+        <BottomNavigationAction showLabel label="I miei turni" icon={<EventNoteIcon />}
+          component={Link} href={`/d/${token}/turni`} />
+      </BottomNavigation>
+    </Box>
   );
 }

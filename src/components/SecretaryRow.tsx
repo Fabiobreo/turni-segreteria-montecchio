@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { updateSecretary } from "@/app/manager/actions";
+import { updateSecretary, deleteSecretary } from "@/app/manager/actions";
 import Paper from "@mui/material/Paper";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -11,17 +11,14 @@ import MenuItem from "@mui/material/MenuItem";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Chip from "@mui/material/Chip";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
 
-export const COLORS = [
-  { key: "mara",  hex: "#2f6df6", label: "Blu" },
-  { key: "sonia", hex: "#138a4a", label: "Verde" },
-  { key: "bea",   hex: "#c0392b", label: "Rosso" },
-  { key: "emma",  hex: "#6a3fc0", label: "Viola" },
-  { key: "ari",   hex: "#b7791f", label: "Ambra" },
-  { key: "teal",  hex: "#0891b2", label: "Teal" },
-  { key: "pink",  hex: "#be185d", label: "Rosa" },
-  { key: "slate", hex: "#475569", label: "Grigio" },
-];
+export { COLORS } from "@/lib/colors";
+import { COLORS } from "@/lib/colors";
 
 type Sec = { id: string; name: string; color: string; contractType: string; weeklyMax: number; token: string };
 
@@ -30,6 +27,7 @@ export function SecretaryRow({ sec, baseUrl }: { sec: Sec; baseUrl: string }) {
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [f, setF] = useState({ name: sec.name, contractType: sec.contractType, weeklyMax: sec.weeklyMax, color: sec.color });
   const link = `${baseUrl}/d/${sec.token}`;
 
@@ -69,7 +67,10 @@ export function SecretaryRow({ sec, baseUrl }: { sec: Sec; baseUrl: string }) {
         )}
         <Box sx={{ flex: 1 }} />
         {!editing && (
-          <Button size="small" variant="outlined" onClick={() => setEditing(true)}>✏️ Modifica</Button>
+          <>
+            <Button size="small" variant="outlined" onClick={() => setEditing(true)}>✏️ Modifica</Button>
+            <Button size="small" variant="outlined" color="error" onClick={() => setConfirmDelete(true)}>Elimina</Button>
+          </>
         )}
       </Box>
 
@@ -109,6 +110,34 @@ export function SecretaryRow({ sec, baseUrl }: { sec: Sec; baseUrl: string }) {
       </Box>
 
       {saved && <Typography variant="caption" color="success.main" sx={{ display: "block", mt: 0.5 }}>✓ Modifiche salvate</Typography>}
+
+      {/* Dialog conferma eliminazione */}
+      <Dialog open={confirmDelete} onClose={() => setConfirmDelete(false)}>
+        <DialogTitle>Eliminare {sec.name}?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Questa azione elimina la segretaria e <strong>tutti i suoi turni e disponibilità</strong>.
+            Non è reversibile.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDelete(false)} disabled={pending}>Annulla</Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={pending}
+            onClick={() => {
+              setConfirmDelete(false);
+              startTransition(async () => {
+                await deleteSecretary(sec.id);
+                router.refresh();
+              });
+            }}
+          >
+            {pending ? "Elimino…" : "Elimina"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

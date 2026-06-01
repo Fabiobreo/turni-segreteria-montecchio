@@ -65,6 +65,13 @@ export async function updateSecretary(input: {
   return { ok: true };
 }
 
+export async function deleteSecretary(id: string) {
+  await requireManager();
+  await prisma.secretary.delete({ where: { id } });
+  revalidatePath("/manager", "layout");
+  return { ok: true };
+}
+
 export async function addSecretary(input: {
   name: string;
   contractType: "fisso" | "a_chiamata";

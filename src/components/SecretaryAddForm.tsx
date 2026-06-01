@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addSecretary } from "@/app/manager/actions";
-import { ColorPicker, COLORS } from "./SecretaryRow";
+import { ColorPicker } from "./SecretaryRow";
+import { COLORS } from "@/lib/colors";
 import Paper from "@mui/material/Paper";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
