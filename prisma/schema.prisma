@@ -1,0 +1,59 @@
+// Schema dati — Gestione Turni Segreteria
+// Dev: SQLite. Per il deploy si cambia provider in "postgresql".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// DEV: provider = "sqlite",  url = env("DATABASE_URL") [file:./dev.db]
+// PROD (Vercel+Neon): decommentare il blocco postgresql e commentare questo.
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// datasource db {
+//   provider  = "postgresql"
+//   url       = env("DATABASE_URL")   // Neon pooled connection string
+//   directUrl = env("DIRECT_URL")     // Neon direct connection string
+// }
+
+model Secretary {
+  id           String   @id @default(cuid())
+  name         String
+  contractType String // "fisso" | "a_chiamata"
+  weeklyMax    Int      @default(0) // tetto ORE SETTIMANALI (0 = non impostato). Unico limite usato.
+  color        String // chiave colore: mara | sonia | bea | emma | ari
+  token        String   @unique
+  active       Boolean  @default(true)
+  sort         Int      @default(0)
+
+  availabilities Availability[]
+  shifts         Shift[]
+}
+
+model Availability {
+  id          String   @id @default(cuid())
+  secretary   Secretary @relation(fields: [secretaryId], references: [id], onDelete: Cascade)
+  secretaryId String
+  date        String // YYYY-MM-DD
+  status      String // "disponibile" | "parziale" | "non_disponibile"
+  start       String? // HH:MM (solo se parziale)
+  end         String? // HH:MM (solo se parziale)
+  note        String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([secretaryId, date])
+}
+
+model Shift {
+  id          String   @id @default(cuid())
+  date        String // YYYY-MM-DD
+  secretary   Secretary @relation(fields: [secretaryId], references: [id], onDelete: Cascade)
+  secretaryId String
+  start       String // HH:MM
+  end         String // HH:MM
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
