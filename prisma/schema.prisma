@@ -5,18 +5,13 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// DEV: provider = "sqlite",  url = env("DATABASE_URL") [file:./dev.db]
-// PROD (Vercel+Neon): decommentare il blocco postgresql e commentare questo.
+// DEV: ripristina provider = "sqlite" e url = env("DATABASE_URL") solo
+// PROD: provider = "postgresql" con entrambe le URL Neon
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
-// datasource db {
-//   provider  = "postgresql"
-//   url       = env("DATABASE_URL")   // Neon pooled connection string
-//   directUrl = env("DIRECT_URL")     // Neon direct connection string
-// }
 
 model Secretary {
   id           String   @id @default(cuid())
