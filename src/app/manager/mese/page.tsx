@@ -13,14 +13,11 @@ import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
-import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 
 export default async function MonthPage({
@@ -33,9 +30,10 @@ export default async function MonthPage({
   const monthKey = mese ?? monthKeyOf(toISODate(new Date()));
   const dates = monthDates(monthKey);
 
-  const [secretaries, shifts] = await Promise.all([
+  const [secretaries, shifts, impianti] = await Promise.all([
     prisma.secretary.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
     prisma.shift.findMany({ where: { date: { startsWith: monthKey } }, orderBy: { start: "asc" } }),
+    prisma.impianto.findMany({ orderBy: { sort: "asc" } }),
   ]);
   const secById = new Map(secretaries.map((s) => [s.id, s]));
   const monthlyHours = hoursBySecretary(shifts);
@@ -49,15 +47,18 @@ export default async function MonthPage({
     const ds = shifts.filter((s) => s.date === iso);
     if (ds.length > 0) {
       built++;
-      const { open, close } = officeHours(iso);
-      if (coverageGaps(ds, open, close).length > 0) withGaps++;
+      const hasGap = impianti.some((imp) => {
+        const { open, close } = officeHours(iso, imp);
+        return coverageGaps(ds.filter((s) => s.impianto === imp.id), open, close).length > 0;
+      });
+      if (hasGap) withGaps++;
     }
   }
 
   return (
     <>
       <ManagerTop active="mese" />
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">Panoramica mese</Typography>
@@ -78,6 +79,7 @@ export default async function MonthPage({
                 <span key={s.id} className={`chip ${s.color}`} style={{ display: "inline" }}>{s.name}</span>
               ))}
             </Box>
+            <Box sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <div className="grid">
               {["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"].map((d) => (
                 <div key={d} className="gh">{d}</div>
@@ -87,8 +89,12 @@ export default async function MonthPage({
               ))}
               {dates.map((iso) => {
                 const ds = shifts.filter((s) => s.date === iso);
-                const { open, close } = officeHours(iso);
-                const gaps = ds.length ? coverageGaps(ds, open, close) : [];
+                // gap = unione di tutti gli impianti
+                const firstGap = impianti.flatMap((imp) => {
+                  const { open, close } = officeHours(iso, imp);
+                  return coverageGaps(ds.filter((s) => s.impianto === imp.id), open, close)
+                    .map((g) => ({ ...g, nome: imp.nome }));
+                })[0];
                 return (
                   <Link
                     key={iso}
@@ -104,11 +110,12 @@ export default async function MonthPage({
                         </span>
                       );
                     })}
-                    {gaps.length > 0 && <div className="gap">⚠ {gaps[0].start}–{gaps[0].end}</div>}
+                    {firstGap && <div className="gap">⚠ {firstGap.nome} {firstGap.start}–{firstGap.end}</div>}
                   </Link>
                 );
               })}
             </div>
+            </Box>
           </Paper>
 
           {/* Sidebar stato mese */}

@@ -12,6 +12,11 @@ const secretaries = [
   { name: "Arianna", contractType: "a_chiamata", weeklyMax: 20, color: "ari", token: "ari-c8d2", sort: 5 },
 ];
 
+const impianti = [
+  { id: "estivo", nome: "Piscina Estiva", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 1 },
+  { id: "invernale", nome: "Piscina Invernale", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 2 },
+];
+
 async function main() {
   for (const s of secretaries) {
     await prisma.secretary.upsert({
@@ -21,7 +26,15 @@ async function main() {
       create: s,
     });
   }
-  console.log(`Seed completato: ${secretaries.length} segretarie.`);
+  for (const imp of impianti) {
+    await prisma.impianto.upsert({
+      where: { id: imp.id },
+      // NON sovrascrive orari già impostati dalla manager
+      update: { nome: imp.nome, sort: imp.sort },
+      create: imp,
+    });
+  }
+  console.log(`Seed completato: ${secretaries.length} segretarie, ${impianti.length} impianti.`);
 }
 
 main()

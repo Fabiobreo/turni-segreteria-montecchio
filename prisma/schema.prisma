@@ -44,7 +44,20 @@ model Shift {
   secretaryId String
   start       String // HH:MM
   end         String // HH:MM
+  impianto    String   @default("estivo") // "estivo" | "invernale"
   createdAt   DateTime @default(now())
 
   @@index([date])
+  @@index([date, impianto])
+}
+
+model Impianto {
+  id           String  @id // "estivo" | "invernale"
+  nome         String
+  weekdayOpen  String  // HH:MM
+  weekdayClose String  // HH:MM
+  weekendOpen  String  // HH:MM
+  weekendClose String  // HH:MM
+  attivo       Boolean @default(true)
+  sort         Int     @default(0)
 }

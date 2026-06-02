@@ -17,6 +17,7 @@ export async function saveShift(input: {
   secretaryId: string;
   start: string;
   end: string;
+  impianto?: string;
 }) {
   await requireManager();
   if (toMinutes(input.end) <= toMinutes(input.start)) {
@@ -25,13 +26,51 @@ export async function saveShift(input: {
   if (input.id) {
     await prisma.shift.update({
       where: { id: input.id },
-      data: { date: input.date, secretaryId: input.secretaryId, start: input.start, end: input.end },
+      data: {
+        date: input.date,
+        secretaryId: input.secretaryId,
+        start: input.start,
+        end: input.end,
+        ...(input.impianto ? { impianto: input.impianto } : {}),
+      },
     });
   } else {
     await prisma.shift.create({
-      data: { date: input.date, secretaryId: input.secretaryId, start: input.start, end: input.end },
+      data: {
+        date: input.date,
+        secretaryId: input.secretaryId,
+        start: input.start,
+        end: input.end,
+        impianto: input.impianto ?? "estivo",
+      },
     });
   }
+  revalidatePath("/manager", "layout");
+  return { ok: true };
+}
+
+export async function saveImpianto(input: {
+  id: string;
+  nome: string;
+  weekdayOpen: string;
+  weekdayClose: string;
+  weekendOpen: string;
+  weekendClose: string;
+  attivo: boolean;
+}) {
+  await requireManager();
+  await prisma.impianto.upsert({
+    where: { id: input.id },
+    update: {
+      nome: input.nome,
+      weekdayOpen: input.weekdayOpen,
+      weekdayClose: input.weekdayClose,
+      weekendOpen: input.weekendOpen,
+      weekendClose: input.weekendClose,
+      attivo: input.attivo,
+    },
+    create: { ...input, sort: input.id === "estivo" ? 1 : 2 },
+  });
   revalidatePath("/manager", "layout");
   return { ok: true };
 }

@@ -39,7 +39,7 @@
 .brand-dot { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,#2f6df6,#7aa6ff); flex-shrink:0; }
 
 /* ===== Griglia mensile ===== */
-.grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
+.grid { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; min-width:560px; }
 .gh { font-size:12px; text-transform:uppercase; color:var(--muted); text-align:center; padding:4px 0; }
 .cell { background:#fff; border:1px solid var(--line); border-radius:10px; min-height:104px; padding:8px; cursor:pointer; text-decoration:none; color:inherit; display:block; }
 .cell:hover { border-color:var(--brand); }
@@ -60,7 +60,7 @@
 .scale { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-top:4px; }
 
 /* ===== Griglia settimanale a fasce ===== */
-.weekgrid { display:grid; grid-template-columns:56px repeat(7,1fr); gap:6px; }
+.weekgrid { display:grid; grid-template-columns:56px repeat(7,1fr); gap:6px; min-width:600px; }
 .weekgrid .hcell { font-size:12px; color:var(--muted); text-align:center; padding-bottom:6px; }
 .dayhead { text-align:center; padding:6px 2px; border-radius:8px; background:#fafbfc; border:1px solid var(--line); text-decoration:none; color:inherit; display:block; }
 .dayhead:hover { border-color:var(--brand); }

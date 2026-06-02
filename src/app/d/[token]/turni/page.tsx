@@ -33,11 +33,13 @@ export default async function MyShiftsPage({
   const monthKey = mese ?? monthKeyOf(toISODate(new Date()));
   const dates = monthDates(monthKey);
 
-  const [myShifts, allShifts, others] = await Promise.all([
+  const [myShifts, allShifts, others, impianti] = await Promise.all([
     prisma.shift.findMany({ where: { secretaryId: sec.id, date: { in: dates } }, orderBy: [{ date: "asc" }, { start: "asc" }] }),
     prisma.shift.findMany({ where: { date: { in: dates } } }),
     prisma.secretary.findMany(),
+    prisma.impianto.findMany({ orderBy: { sort: "asc" } }),
   ]);
+  const nomeImpianto = new Map(impianti.map((i) => [i.id, i.nome]));
 
   const nameById = new Map(others.map((o) => [o.id, o.name]));
   const total = myShifts.reduce((a, s) => a + durationHours(s.start, s.end), 0);
@@ -107,7 +109,8 @@ export default async function MyShiftsPage({
                     <Box sx={{ flex: 1 }}>
                       <Typography sx={{ fontWeight: 700 }}>{s.start} – {s.end}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {formatHours(durationHours(s.start, s.end))} ore
+                        {nomeImpianto.get(s.impianto) ?? s.impianto}
+                        {" · "}{formatHours(durationHours(s.start, s.end))} ore
                         {colleagues.length ? ` · con ${colleagues.join(", ")}` : " · da sola"}
                       </Typography>
                     </Box>

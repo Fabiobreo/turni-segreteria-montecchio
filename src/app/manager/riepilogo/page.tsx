@@ -16,7 +16,6 @@ import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
 import Divider from "@mui/material/Divider";
@@ -37,9 +36,10 @@ export default async function RiepilogoPage({
   const dates = monthDates(monthKey);
   const monthDatesSet = new Set(dates);
 
-  const [secretaries, shifts] = await Promise.all([
+  const [secretaries, shifts, impianti] = await Promise.all([
     prisma.secretary.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
     prisma.shift.findMany({ where: { date: { startsWith: monthKey } }, orderBy: { start: "asc" } }),
+    prisma.impianto.findMany({ orderBy: { sort: "asc" } }),
   ]);
   const monthlyHours = hoursBySecretary(shifts);
 
@@ -47,8 +47,10 @@ export default async function RiepilogoPage({
   const daysWithGaps = dates.filter((iso) => {
     const ds = shifts.filter((s) => s.date === iso);
     if (!ds.length) return false;
-    const { open, close } = officeHours(iso);
-    return coverageGaps(ds, open, close).length > 0;
+    return impianti.some((imp) => {
+      const { open, close } = officeHours(iso, imp);
+      return coverageGaps(ds.filter((s) => s.impianto === imp.id), open, close).length > 0;
+    });
   });
   const label = `${monthName(monthKey)} ${monthKey.slice(0, 4)}`;
 
@@ -76,8 +78,11 @@ export default async function RiepilogoPage({
       hasGaps: wd.some((iso) => {
         if (!monthDatesSet.has(iso)) return false;
         const ds = weekShifts.filter((sh) => sh.date === iso);
-        const { open, close } = officeHours(iso);
-        return ds.length === 0 || coverageGaps(ds, open, close).length > 0;
+        return impianti.some((imp) => {
+          const { open, close } = officeHours(iso, imp);
+          const impShifts = ds.filter((s) => s.impianto === imp.id);
+          return impShifts.length === 0 || coverageGaps(impShifts, open, close).length > 0;
+        });
       }),
     });
     wStart = addDays(wStart, 7);
@@ -86,7 +91,7 @@ export default async function RiepilogoPage({
   return (
     <>
       <ManagerTop active="riepilogo" />
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">Riepilogo mensile</Typography>

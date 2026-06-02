@@ -4,7 +4,7 @@ import { requireManager } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ManagerTop } from "@/components/ManagerTop";
 import { WeekPoster } from "@/components/WeekPoster";
-import { officeHours } from "@/lib/office";
+import { officeHours, referenceHours } from "@/lib/office";
 import { coverageGaps, assignLanes, hoursBySecretary } from "@/lib/coverage";
 import { topPx, heightPx, hourLabels, GRID_HEIGHT } from "@/lib/grid";
 import {
@@ -35,7 +35,7 @@ export default async function WeekPage({
   const days = weekDates(monday);
   const monthKey = monthKeyOf(monday);
 
-  const [secretaries, weekShifts, weekAvail, monthShifts, recent] = await Promise.all([
+  const [secretaries, weekShifts, weekAvail, monthShifts, recent, impianti] = await Promise.all([
     prisma.secretary.findMany({ where: { active: true }, orderBy: { sort: "asc" } }),
     prisma.shift.findMany({ where: { date: { in: days } } }),
     prisma.availability.findMany({ where: { date: { in: days } } }), // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -43,6 +43,7 @@ export default async function WeekPage({
     prisma.availability.count({
       where: { updatedAt: { gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) } },
     }),
+    prisma.impianto.findMany({ orderBy: { sort: "asc" } }),
   ]);
 
   const secById = new Map(secretaries.map((s) => [s.id, s]));
@@ -60,9 +61,12 @@ export default async function WeekPage({
     ),
   }));
   const posterHasGaps = days.some((iso) => {
-    const { open, close } = officeHours(iso);
-    const ds = weekShifts.filter((sh) => sh.date === iso);
-    return ds.length === 0 || coverageGaps(ds, open, close).length > 0;
+    const dayShifts = weekShifts.filter((sh) => sh.date === iso);
+    return impianti.some((imp) => {
+      const { open, close } = officeHours(iso, imp);
+      const impShifts = dayShifts.filter((s) => s.impianto === imp.id);
+      return impShifts.length === 0 || coverageGaps(impShifts, open, close).length > 0;
+    });
   });
 
   return (
@@ -73,7 +77,7 @@ export default async function WeekPage({
           <Chip label={`🔔 ${recent} disponibilità aggiornate`} size="small" color="warning" />
         ) : null}
       />
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 3, flexWrap: "wrap" }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" color="text.secondary">Costruzione turni · vista a fasce</Typography>
@@ -95,6 +99,7 @@ export default async function WeekPage({
             <Chip label="▨ fascia scoperta" color="error" size="small" variant="outlined" />
             <Chip label="colonne affiancate = raddoppio" color="info" size="small" variant="outlined" />
           </Box>
+          <Box sx={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
           <div className="weekgrid">
             <div className="hcell" />
             {days.map((iso) => (
@@ -109,19 +114,25 @@ export default async function WeekPage({
               ))}
             </div>
             {days.map((iso) => {
-              const { open, close } = officeHours(iso);
+              const { open: refOpen, close: refClose } = referenceHours(iso, impianti);
               const dayShifts = weekShifts.filter((s) => s.date === iso);
-              const gaps = coverageGaps(dayShifts, open, close);
+              // Gap visivi: unione tra tutti gli impianti
+              const gapsAll = impianti.flatMap((imp) => {
+                const { open, close } = officeHours(iso, imp);
+                const impShifts = dayShifts.filter((s) => s.impianto === imp.id);
+                return coverageGaps(impShifts, open, close).map((g) => ({ ...g, nome: imp.nome }));
+              });
+              const hasGap = gapsAll.length > 0;
               const { items, lanes } = assignLanes(dayShifts);
               return (
                 <Link key={iso} href={`/manager/giorno/${iso}`}
-                  className={`daybody${gaps.length ? " gap-day" : ""}`}
+                  className={`daybody${hasGap ? " gap-day" : ""}`}
                   style={{ display: "block" }}>
-                  {topPx(open) > 0 && <div className="closed" style={{ top: 0, height: topPx(open) }} />}
-                  {topPx(close) < GRID_HEIGHT && <div className="closed" style={{ top: topPx(close), height: GRID_HEIGHT - topPx(close) }} />}
-                  {gaps.map((g, i) => (
+                  {topPx(refOpen) > 0 && <div className="closed" style={{ top: 0, height: topPx(refOpen) }} />}
+                  {topPx(refClose) < GRID_HEIGHT && <div className="closed" style={{ top: topPx(refClose), height: GRID_HEIGHT - topPx(refClose) }} />}
+                  {gapsAll.map((g, i) => (
                     <div key={i} className="wgap" style={{ top: topPx(g.start), height: heightPx(g.start, g.end) }}>
-                      ▨ scoperto<br />{g.start}–{g.end}
+                      ▨ {g.nome}<br />{g.start}–{g.end}
                     </div>
                   ))}
                   {items.map(({ shift, lane }) => {
@@ -139,6 +150,7 @@ export default async function WeekPage({
               );
             })}
           </div>
+          </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
             💡 Tocca un giorno per aggiungere o modificare i turni. Le zone grigie sono fuori orario d&apos;ufficio.
           </Typography>
@@ -187,21 +199,31 @@ export default async function WeekPage({
             <Typography variant="h3" sx={{ mb: 1.5 }}>Avvisi settimana</Typography>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {days.flatMap((iso) => {
-                const { open, close } = officeHours(iso);
-                const ds = weekShifts.filter((s) => s.date === iso);
-                const gaps = coverageGaps(ds, open, close);
-                if (ds.length === 0) return [
-                  <Chip key={`${iso}-empty`} label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · nessun turno`} color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
-                ];
-                if (gaps.length > 0) return [
-                  <Chip key={`${iso}-gap`} label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · scoperto ${gaps[0].start}–${gaps[0].end}`} color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
-                ];
-                return [];
+                const dayShifts = weekShifts.filter((s) => s.date === iso);
+                return impianti.flatMap((imp) => {
+                  const { open, close } = officeHours(iso, imp);
+                  const impShifts = dayShifts.filter((s) => s.impianto === imp.id);
+                  const gaps = coverageGaps(impShifts, open, close);
+                  if (impShifts.length === 0) return [
+                    <Chip key={`${iso}-${imp.id}-empty`}
+                      label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · ${imp.nome}: nessun turno`}
+                      color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
+                  ];
+                  if (gaps.length > 0) return [
+                    <Chip key={`${iso}-${imp.id}-gap`}
+                      label={`⚠ ${dayShort(iso)} ${dayNum(iso)} · ${imp.nome}: scoperto ${gaps[0].start}–${gaps[0].end}`}
+                      color="error" size="small" sx={{ alignSelf: "flex-start" }} />,
+                  ];
+                  return [];
+                });
               })}
               {days.every((iso) => {
-                const { open, close } = officeHours(iso);
-                const ds = weekShifts.filter((s) => s.date === iso);
-                return ds.length > 0 && coverageGaps(ds, open, close).length === 0;
+                const dayShifts = weekShifts.filter((s) => s.date === iso);
+                return impianti.every((imp) => {
+                  const { open, close } = officeHours(iso, imp);
+                  const impShifts = dayShifts.filter((s) => s.impianto === imp.id);
+                  return impShifts.length > 0 && coverageGaps(impShifts, open, close).length === 0;
+                });
               }) && <Chip label="✓ Tutti i giorni coperti" color="success" size="small" sx={{ alignSelf: "flex-start" }} />}
             </Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1.5 }}>
