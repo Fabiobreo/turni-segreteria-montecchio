@@ -51,6 +51,20 @@ model Shift {
   @@index([date, impianto])
 }
 
+model AuditLog {
+  id      String   @id @default(cuid())
+  at      DateTime @default(now())
+  actor   String // chi ha fatto la modifica: nome segretaria o "Manager"
+  entity  String // "availability" | "shift" | "secretary" | "impianto"
+  action  String // "create" | "update" | "delete"
+  summary String // descrizione leggibile della modifica
+  date    String? // giorno interessato (YYYY-MM-DD), se applicabile
+  before  String? // JSON dello stato precedente
+  after   String? // JSON dello stato successivo
+
+  @@index([at])
+}
+
 model Impianto {
   id           String  @id // "estivo" | "invernale"
   nome         String

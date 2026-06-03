@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { setAvailability, setManyAvailability, clearMonth } from "@/app/d/actions";
-import { dayShort, dayNum, isWeekend, addMonthsKey } from "@/lib/time";
+import { setAvailability, setManyAvailability, clearMonth, copyWeekAvailability } from "@/app/d/actions";
+import { dayShort, dayNum, isWeekend, addMonthsKey, mondayOf, weekLabel, addDays, toISODate } from "@/lib/time";
 import { COLORS } from "@/lib/colors";
 
 import Box from "@mui/material/Box";
@@ -16,6 +16,8 @@ import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
 import Collapse from "@mui/material/Collapse";
 import TextField from "@mui/material/TextField";
 import ToggleButton from "@mui/material/ToggleButton";
@@ -26,6 +28,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import AddIcon from "@mui/icons-material/Add";
@@ -50,6 +53,23 @@ export function AvailabilityEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [data, setData] = useState<Record<string, Entry>>(initial);
+
+  // Raggruppa i giorni del mese per settimana (lunedì → domenica).
+  const weeks: { monday: string; days: Day[] }[] = [];
+  for (const day of days) {
+    const monday = mondayOf(day.iso);
+    const last = weeks[weeks.length - 1];
+    if (last && last.monday === monday) last.days.push(day);
+    else weeks.push({ monday, days: [day] });
+  }
+
+  // Tab attivo: di default la settimana che contiene oggi (se nel mese), altrimenti la prima.
+  const [tab, setTab] = useState(() => {
+    const todayIso = toISODate(new Date());
+    const i = weeks.findIndex((w) => w.days.some((d) => d.iso === todayIso));
+    return i >= 0 ? i : 0;
+  });
+  const week = weeks[tab] ?? weeks[0];
 
   const statusOf = (iso: string): Status => (data[iso]?.status as Status) ?? "none";
 
@@ -145,6 +165,29 @@ export function AvailabilityEditor({
     });
   }
 
+  /**
+   * Copia la disponibilità dalla settimana di calendario precedente su quella corrente.
+   * Lato server: la sorgente può essere nel mese prima (1ª settimana) e la destinazione
+   * può sforare nel mese dopo (ultima settimana).
+   */
+  function copyFromPrevious() {
+    if (!week) return;
+    const fromMonday = addDays(week.monday, -7);
+    startTransition(async () => {
+      const res = await copyWeekAvailability({ token, fromMonday, toMonday: week.monday, monthKey });
+      if (res.ok) {
+        const applied = res.result ?? [];
+        const removed = res.cleared ?? [];
+        setData((prev) => {
+          const next = { ...prev };
+          for (const r of applied) next[r.date] = { status: r.status, slots: r.slots, note: r.note };
+          for (const iso of removed) delete next[iso];
+          return next;
+        });
+      }
+    });
+  }
+
   const set = days.filter((d) => statusOf(d.iso) !== "none").length;
   const progress = days.length > 0 ? (set / days.length) * 100 : 0;
   const colorHex = COLORS.find((c) => c.key === secColor)?.hex ?? "#2f6df6";
@@ -171,9 +214,6 @@ export function AvailabilityEditor({
             </IconButton>
           </Box>
         </Box>
-        <Alert severity="info" sx={{ borderRadius: 0, borderLeft: 0, borderRight: 0, fontSize: "0.8rem", py: 0.5 }}>
-          Inserisci preferibilmente entro il <strong>25 del mese precedente</strong>. Puoi sempre modificare.
-        </Alert>
       </Box>
 
       {/* ── CORPO ── */}
@@ -214,9 +254,49 @@ export function AvailabilityEditor({
             sx={{ borderRadius: 1, height: 6 }} />
         </Box>
 
-        {/* Lista giorni */}
+        {/* Tab settimane */}
+        <Tabs
+          value={tab}
+          onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ mb: 1, minHeight: 40, "& .MuiTab-root": { minHeight: 40, minWidth: 64, py: 0.5 } }}
+        >
+          {weeks.map((w, i) => {
+            const compilati = w.days.filter((d) => statusOf(d.iso) !== "none").length;
+            const completa = compilati === w.days.length;
+            return (
+              <Tab
+                key={w.monday}
+                label={`${dayNum(w.days[0].iso)}–${dayNum(w.days[w.days.length - 1].iso)}${completa ? " ✓" : ""}`}
+                sx={{ fontWeight: i === tab ? 700 : 500, color: completa ? "success.main" : undefined }}
+              />
+            );
+          })}
+        </Tabs>
+
+        {/* Header settimana + copia dalla precedente */}
+        {week && (
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.25, flexWrap: "wrap" }}>
+            <Typography variant="caption" color="text.secondary" sx={{ flex: 1, textTransform: "capitalize" }}>
+              {weekLabel(week.monday)}
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<ContentCopyIcon sx={{ fontSize: 16 }} />}
+              disabled={pending}
+              onClick={copyFromPrevious}
+              title="Copia la settimana di calendario precedente (anche dal mese prima)"
+            >
+              Copia dalla precedente
+            </Button>
+          </Box>
+        )}
+
+        {/* Lista giorni della settimana selezionata */}
         <Stack spacing={0.75}>
-          {days.map((day) => {
+          {(week?.days ?? []).map((day) => {
             const st    = statusOf(day.iso);
             const entry = data[day.iso];
             const we    = isWeekend(day.iso);

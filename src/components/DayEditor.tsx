@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveShift, deleteShift } from "@/app/manager/actions";
 import { toMinutes, durationHours, formatHours } from "@/lib/time";
-import { coverageGaps, maxConcurrent } from "@/lib/coverage";
+import { parseSlots } from "@/lib/validation";
+import { MAX_ORE_GIORNO } from "@/lib/constants";
+import { coverageGaps, maxConcurrent, hoursBySecretary } from "@/lib/coverage";
 import { officeHours, type ImpiantoConfig } from "@/lib/office";
 import { DayGantt } from "./DayGantt";
 import Box from "@mui/material/Box";
@@ -13,11 +15,9 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import Select from "@mui/material/Select";
-import InputLabel from "@mui/material/InputLabel";
-import FormControl from "@mui/material/FormControl";
 import Chip from "@mui/material/Chip";
 import Alert from "@mui/material/Alert";
+import Snackbar from "@mui/material/Snackbar";
 import Divider from "@mui/material/Divider";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -41,12 +41,17 @@ export function DayEditor({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [impiantoCrea, setImpiantoCrea] = useState(impianti[0]?.id ?? "estivo");
   const [form, setForm] = useState<{ id: string | null; secretaryId: string; start: string; end: string; impianto: string } | null>(null);
+  // Feedback unificato: messaggio + eventuale turno da ripristinare (undo).
+  const [snack, setSnack] = useState<{ msg: string; undo?: Shift } | null>(null);
+
+  const defaultImpianto = impianti[0]?.id ?? "estivo";
 
   const secById    = new Map(secretaries.map((s) => [s.id, s]));
   const availBySec = new Map(availabilities.map((a) => [a.secretaryId, a]));
   const impiantoById = new Map(impianti.map((i) => [i.id, i]));
+  // Ore totali per segretaria in questo giorno (per il tetto giornaliero).
+  const dailyHours = hoursBySecretary(shifts);
 
   // Copertura per impianto
   const coverageByImpianto = impianti.map((imp) => {
@@ -57,8 +62,9 @@ export function DayEditor({
     return { impianto: imp, open: o, close: c, impShifts, gaps, overCap };
   });
 
-  // Gaps unione per overlay nel Gantt
-  const allGaps = coverageByImpianto.flatMap((c) => c.gaps);
+  // Gaps per impianto (ogni sotto-riga del Gantt mostra i propri)
+  const gapsByImpianto: Record<string, { start: string; end: string }[]> =
+    Object.fromEntries(coverageByImpianto.map((c) => [c.impianto.id, c.gaps]));
 
   // Orari attivi dell'impianto selezionato nel form (per preset)
   const impFormConfig = form ? (impiantoById.get(form.impianto) ?? impianti[0]) : null;
@@ -71,21 +77,19 @@ export function DayEditor({
     if (a.status === "disponibile") return "si";
     if (a.status === "non_disponibile") return "no";
     if (a.status === "parziale" && a.slots) {
-      const slots: { start: string; end: string }[] = JSON.parse(a.slots);
+      const slots = parseSlots(a.slots);
       const covers = slots.some((s) => toMinutes(s.start) <= toMinutes(start) && toMinutes(end) <= toMinutes(s.end));
       return covers ? "si" : "no";
     }
     return "non_indicata";
   }
 
-  function startAdd(secretaryId = secretaries[0]?.id ?? "", start = open, end = "14:00", impianto = impiantoCrea) {
+  function startAdd(secretaryId = secretaries[0]?.id ?? "", start = open, end = "14:00", impianto = defaultImpianto) {
     setError(null);
-    setImpiantoCrea(impianto);
     setForm({ id: null, secretaryId, start, end, impianto });
   }
   function startEdit(s: Shift) {
     setError(null);
-    setImpiantoCrea(s.impianto);
     setForm({ id: s.id, secretaryId: s.secretaryId, start: s.start, end: s.end, impianto: s.impianto });
   }
 
@@ -99,22 +103,34 @@ export function DayEditor({
         impianto: form.impianto,
       });
       if (!res.ok) { setError(res.error ?? "Errore"); return; }
+      const wasEdit = !!form.id;
       setForm(null); router.refresh();
+      setSnack({ msg: wasEdit ? "Turno aggiornato ✓" : "Turno salvato ✓" });
     });
   }
-  function remove(id: string) {
-    startTransition(async () => { await deleteShift(id); router.refresh(); });
+  function remove(s: Shift) {
+    startTransition(async () => {
+      await deleteShift(s.id);
+      router.refresh();
+      setSnack({ msg: "Turno rimosso", undo: s });
+    });
+  }
+  function undoRemove(s: Shift) {
+    startTransition(async () => {
+      const res = await saveShift({ date, secretaryId: s.secretaryId, start: s.start, end: s.end, impianto: s.impianto });
+      router.refresh();
+      setSnack(res.ok ? { msg: "Turno ripristinato ✓" } : { msg: res.error ?? "Ripristino non riuscito" });
+    });
   }
   function saveDirect(id: string | null, secretaryId: string, start: string, end: string, impianto: string) {
     setError(null);
     startTransition(async () => {
-      const existing = id ? shifts.find((s) => s.id === id) : null;
       const res = await saveShift({
-        id: id ?? undefined, date, secretaryId, start, end,
-        impianto: existing?.impianto ?? impianto,
+        id: id ?? undefined, date, secretaryId, start, end, impianto,
       });
-      if (!res.ok) { setError(res.error ?? "Errore"); return; }
+      if (!res.ok) { setError(res.error ?? "Errore"); setSnack({ msg: res.error ?? "Errore" }); return; }
       router.refresh();
+      setSnack({ msg: "Turno salvato ✓" });
     });
   }
 
@@ -135,7 +151,20 @@ export function DayEditor({
       : null
     : null;
 
+  // Avviso tetto giornaliero: somma altri turni del giorno + quello in modifica.
+  const capWarn = (() => {
+    if (!form) return null;
+    const altri = shifts
+      .filter((s) => s.secretaryId === form.secretaryId && s.id !== form.id)
+      .reduce((a, s) => a + durationHours(s.start, s.end), 0);
+    const tot = altri + Math.max(0, durationHours(form.start, form.end));
+    return tot > MAX_ORE_GIORNO + 0.001
+      ? `Supererebbe il massimo giornaliero: ${formatHours(tot)} h in totale oggi (max ${formatHours(MAX_ORE_GIORNO)} h/giorno).`
+      : null;
+  })();
+
   return (
+   <>
     <Box sx={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
       {/* COLONNA SINISTRA */}
       <Box sx={{ flex: 1, minWidth: { xs: "100%", sm: 440 } }}>
@@ -153,41 +182,22 @@ export function DayEditor({
             ))}
           </Box>
 
-          {/* Select compatto: impianto di default per i turni creati via drag */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
-            <FormControl size="small" sx={{ minWidth: 190 }}>
-              <InputLabel id="imp-crea-label">Impianto (nuovi turni)</InputLabel>
-              <Select
-                labelId="imp-crea-label"
-                label="Impianto (nuovi turni)"
-                value={impiantoCrea}
-                onChange={(e) => { setImpiantoCrea(e.target.value); if (form) setForm({ ...form, impianto: e.target.value }); }}
-              >
-                {impianti.map((imp) => (
-                  <MenuItem key={imp.id} value={imp.id}>
-                    {imp.id === "estivo" ? "☀" : imp.id === "invernale" ? "❄" : ""} {imp.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <Typography variant="caption" color="text.secondary">
-              Usato per nuovi turni via drag · tasto destro su un turno per cambiare impianto
-            </Typography>
-          </Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
+            La sotto-riga sceglie l&apos;impianto: trascina sulla riga ☀ per un turno estivo, sulla ❄ per uno invernale. Tasto destro su un turno per spostarlo tra impianti.
+          </Typography>
 
           {/* Gantt */}
           <DayGantt
-            open={open} close={close}
+            open={open} close={close} date={date}
             secretaries={secretaries}
             shifts={shifts}
             availabilities={availabilities}
-            gaps={allGaps}
-            impiantoCrea={impiantoCrea}
+            gapsByImpianto={gapsByImpianto}
             impianti={impianti}
             onCreate={(secId, start, end, impianto) => saveDirect(null, secId, start, end, impianto)}
-            onUpdate={(id, secId, start, end) => saveDirect(id, secId, start, end, "")}
+            onUpdate={(id, secId, start, end, impianto) => saveDirect(id, secId, start, end, impianto)}
             onSelect={(s) => startEdit(s)}
-            onDelete={(id) => remove(id)}
+            onDelete={(id) => { const sh = shifts.find((x) => x.id === id); if (sh) remove(sh); }}
             onChangeImpianto={(id, newImp) => changeImpianto(id, newImp)}
           />
 
@@ -243,27 +253,34 @@ export function DayEditor({
             {shifts.map((s) => {
               const sec = secById.get(s.secretaryId);
               const imp = impiantoById.get(s.impianto);
+              const conflict = availForRange(s.secretaryId, s.start, s.end) === "no";
+              const overDay = (dailyHours[s.secretaryId] ?? 0) > MAX_ORE_GIORNO + 0.001;
+              const flagged = conflict || overDay;
               if (form?.id === s.id) return <Box key={s.id}>{ShiftForm()}</Box>;
               return (
-                <Paper key={s.id} variant="outlined" sx={{ p: 1.5 }}>
+                <Paper key={s.id} variant="outlined" sx={{ p: 1.5, ...(flagged && { borderColor: "warning.main", bgcolor: "#fff8e1" }) }}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                     <span className={`chip ${sec?.color ?? ""}`} style={{ display: "inline" }}>{sec?.name}</span>
                     <Chip label={imp?.nome ?? s.impianto} size="small" variant="outlined" color="info" />
                     <Typography sx={{ fontWeight: 700 }}>{s.start}–{s.end}</Typography>
                     <Chip label={`${formatHours(durationHours(s.start, s.end))} h`} size="small" color="info" />
+                    {conflict && (
+                      <Chip label="⚠ non disponibile" size="small" color="warning"
+                        title="La segretaria non risulta disponibile in questa fascia." />
+                    )}
+                    {overDay && (
+                      <Chip label={`⚠ ${formatHours(dailyHours[s.secretaryId])} h/giorno`} size="small" color="warning"
+                        title={`Oltre il massimo di ${formatHours(MAX_ORE_GIORNO)} h al giorno.`} />
+                    )}
                     <Box sx={{ flex: 1 }} />
                     <Button size="small" variant="outlined" onClick={() => startEdit(s)} disabled={pending}>Modifica</Button>
-                    <Button size="small" variant="text" color="error" onClick={() => remove(s.id)} disabled={pending}>Rimuovi</Button>
+                    <Button size="small" variant="text" color="error" onClick={() => remove(s)} disabled={pending}>Rimuovi</Button>
                   </Box>
                 </Paper>
               );
             })}
             {form && form.id === null && ShiftForm()}
           </Box>
-
-          <Alert severity="info" sx={{ mt: 2, fontSize: "0.8rem" }}>
-            Il raddoppio lo decidi tu: aggiungi un turno sovrapposto nelle fasce da rinforzare.
-          </Alert>
         </Paper>
       </Box>
 
@@ -322,7 +339,7 @@ export function DayEditor({
                 if (a?.status === "disponibile") { chip = <Chip label="Sì" size="small" color="success" />; detail = "tutto il giorno"; }
                 else if (a?.status === "parziale") {
                   chip = <Chip label="Parz." size="small" color="warning" />;
-                  const slots: { start: string; end: string }[] = a.slots ? JSON.parse(a.slots) : [];
+                  const slots = parseSlots(a.slots);
                   detail = slots.map((s) => `${s.start}–${s.end}`).join(", ") || "orari non specificati";
                 }
                 else if (a?.status === "non_disponibile") { chip = <Chip label="No" size="small" color="error" />; detail = "non disponibile"; }
@@ -343,6 +360,23 @@ export function DayEditor({
         </Paper>
       </Box>
     </Box>
+
+    <Snackbar
+      open={!!snack}
+      autoHideDuration={snack?.undo ? 6000 : 3000}
+      onClose={() => setSnack(null)}
+      anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      message={snack?.msg}
+      action={
+        snack?.undo ? (
+          <Button color="warning" size="small" disabled={pending}
+            onClick={() => { const s = snack.undo!; setSnack(null); undoRemove(s); }}>
+            Annulla
+          </Button>
+        ) : undefined
+      }
+    />
+   </>
   );
 
   function ShiftForm() {
@@ -354,7 +388,7 @@ export function DayEditor({
 
           {/* Selettore impianto */}
           <TextField select size="small" label="Impianto" value={form.impianto}
-            onChange={(e) => { setForm({ ...form, impianto: e.target.value }); setImpiantoCrea(e.target.value); }}
+            onChange={(e) => setForm({ ...form, impianto: e.target.value })}
             sx={{ minWidth: 180 }}>
             {impianti.map((imp) => (
               <MenuItem key={imp.id} value={imp.id}>
@@ -405,6 +439,7 @@ export function DayEditor({
         </Paper>
 
         {availWarn && <Alert severity="warning" sx={{ mt: 1, fontSize: "0.8rem" }}>{availWarn}</Alert>}
+        {capWarn && <Alert severity="warning" sx={{ mt: 1, fontSize: "0.8rem" }}>{capWarn}</Alert>}
         {error && <Alert severity="error" sx={{ mt: 1, fontSize: "0.8rem" }}>{error}</Alert>}
       </Paper>
     );

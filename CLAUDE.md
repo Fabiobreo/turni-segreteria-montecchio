@@ -52,7 +52,8 @@ npm è in `C:\Program Files\nodejs\npm.cmd` — disponibile in PowerShell, **non
 
 ## Regole di dominio importanti
 
-- **Nessun target mensile**: il mese è solo un contatore di "ore lavorate" (nessun colore/target). L'unico limite è `weeklyMax` (settimanale). I vecchi campi `targetHours`/`binding` sono stati **rimossi** — non reintrodurli.
+- **Nessun target mensile**: il mese è solo un contatore di "ore lavorate" (nessun colore/target). I vecchi campi `targetHours`/`binding` sono stati **rimossi** — non reintrodurli.
+- **Limiti ore**: tetto **settimanale** per segretaria = `weeklyMax` (0 = non impostato) + tetto **giornaliero** = `MAX_ORE_GIORNO` (6,5 h, `src/lib/constants.ts`). La bozza automatica li rispetta come vincoli rigidi; l'editor del giorno **avvisa** se un turno manuale sfora le 6,5 h/giorno (non blocca).
 - **Ore turno** = `end − start`. Nessuna pausa pranzo dedotta; più turni nello stesso giorno si sommano.
 - **Orari ufficio** (stagione estiva attiva, `src/lib/office.ts`): feriali 08:00–20:30, weekend 09:00–19:30. Max 2 persone in contemporanea; copertura piena obbligatoria. L'app **avvisa** su buchi e su >2 persone, ma non impedisce nulla. Stagione invernale: struttura pronta, orari da definire.
 - Il raddoppio (2 persone insieme) è a discrezione della manager.

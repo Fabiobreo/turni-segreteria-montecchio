@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { AvailabilityEditor } from "@/components/AvailabilityEditor";
 import { monthDates, monthName, monthKeyOf, toISODate } from "@/lib/time";
+import { parseSlots } from "@/lib/validation";
 import { referenceHours } from "@/lib/office";
 
 export default async function AvailabilityPage({
@@ -28,7 +29,7 @@ export default async function AvailabilityPage({
   for (const a of availabilities) {
     availMap[a.date] = {
       status: a.status,
-      slots: a.slots ? (JSON.parse(a.slots) as Slot[]) : [],
+      slots: parseSlots(a.slots),
       note: a.note,
     };
   }

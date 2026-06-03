@@ -26,6 +26,7 @@ const MESI = [
   "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
   "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
 ];
+const MESI_BREVI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
 const GIORNI_BREVI = ["dom", "lun", "mar", "mer", "gio", "ven", "sab"];
 const GIORNI_LUNGHI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
 
@@ -76,6 +77,11 @@ export function dayLong(iso: string): string {
 }
 export function dayNum(iso: string): number {
   return parseDate(iso).getDate();
+}
+/** "12 giu" — giorno + mese abbreviato. */
+export function dayMonthShort(iso: string): string {
+  const d = parseDate(iso);
+  return `${d.getDate()} ${MESI_BREVI[d.getMonth()]}`;
 }
 export function monthName(monthKey: string): string {
   const [, m] = monthKey.split("-").map(Number);

@@ -145,24 +145,33 @@ export function SecretaryRow({ sec, baseUrl }: { sec: Sec; baseUrl: string }) {
 export function ColorPicker({ value, onChange }: { value: string; onChange: (k: string) => void }) {
   return (
     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-      {COLORS.map((c) => (
-        <Box
-          key={c.key}
-          component="button"
-          type="button"
-          onClick={() => onChange(c.key)}
-          title={c.label}
-          sx={{
-            width: 28, height: 28, borderRadius: "50%", border: "none", cursor: "pointer",
-            bgcolor: c.hex,
-            outline: value === c.key ? `3px solid ${c.hex}` : "3px solid transparent",
-            outlineOffset: 2,
-            opacity: value === c.key ? 1 : 0.5,
-            transition: "opacity .15s, outline .15s",
-            p: 0,
-          }}
-        />
-      ))}
+      {COLORS.map((c) => {
+        const selected = value === c.key;
+        return (
+          <Box
+            key={c.key}
+            component="button"
+            type="button"
+            onClick={() => onChange(c.key)}
+            title={c.label}
+            aria-label={`Colore ${c.label}${selected ? " (selezionato)" : ""}`}
+            aria-pressed={selected}
+            sx={{
+              width: 28, height: 28, borderRadius: "50%", border: "none", cursor: "pointer",
+              bgcolor: c.hex,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 16, fontWeight: 900, lineHeight: 1,
+              outline: selected ? `3px solid ${c.hex}` : "3px solid transparent",
+              outlineOffset: 2,
+              opacity: selected ? 1 : 0.5,
+              transition: "opacity .15s, outline .15s",
+              p: 0,
+            }}
+          >
+            {selected ? "✓" : ""}
+          </Box>
+        );
+      })}
     </Box>
   );
 }
