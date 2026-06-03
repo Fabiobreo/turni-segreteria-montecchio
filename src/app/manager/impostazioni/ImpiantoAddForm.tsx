@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createImpianto } from "@/app/manager/actions";
+import { IconaPicker } from "./IconaPicker";
 import Paper from "@mui/material/Paper";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -14,6 +15,7 @@ import Alert from "@mui/material/Alert";
 
 const DEFAULTS = {
   nome: "",
+  icona: "🏢",
   weekdayOpen: "08:00",
   weekdayClose: "20:30",
   weekendOpen: "09:00",
@@ -59,6 +61,8 @@ export function ImpiantoAddForm() {
         <TextField label="Nome impianto" placeholder="Es. Piscina comunale" autoFocus size="small"
           value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })}
           onKeyDown={(e) => e.key === "Enter" && submit()} sx={{ maxWidth: 320 }} />
+
+        <IconaPicker value={f.icona} onChange={(icona) => setF({ ...f, icona })} />
 
         <Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1, fontWeight: 600 }}>

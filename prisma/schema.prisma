@@ -68,6 +68,7 @@ model AuditLog {
 model Impianto {
   id           String  @id // "estivo" | "invernale"
   nome         String
+  icona        String  @default("🏢") // emoji mostrata nei badge / blocchi turno
   weekdayOpen  String  // HH:MM
   weekdayClose String  // HH:MM
   weekendOpen  String  // HH:MM

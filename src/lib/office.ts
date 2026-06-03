@@ -3,6 +3,7 @@ import { isWeekend } from "./time";
 export type ImpiantoConfig = {
   id: string;
   nome: string;
+  icona: string;
   weekdayOpen: string;
   weekdayClose: string;
   weekendOpen: string;

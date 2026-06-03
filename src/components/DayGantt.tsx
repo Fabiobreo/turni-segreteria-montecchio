@@ -40,10 +40,6 @@ type Drag =
 const SNAP   = 15;   // minuti
 const GUTTER = 132;  // larghezza colonna nomi (px)
 
-// Icona testuale per impianto — usata nei badge e dentro i blocchi
-const IMP_ICON: Record<string, string> = { estivo: "☀", invernale: "❄" };
-function impIcon(id: string) { return IMP_ICON[id] ?? id.slice(0, 1).toUpperCase(); }
-
 /** Segmenti di disponibilità che coprono [open, close] per una segretaria. */
 function availSegments(a: Avail | undefined, oMin: number, cMin: number): Seg[] {
   if (!a || a.status === "non_indicata" || !a.status) return [{ kind: "unknown", start: oMin, end: cMin }];
@@ -92,6 +88,10 @@ export function DayGantt({
   const cMin = toMinutes(close);
   const span = cMin - oMin;
   const pct  = (min: number) => ((min - oMin) / span) * 100;
+
+  // Icona testuale per impianto — dalla config dell'impianto (badge e blocchi).
+  const iconById = new Map(impianti.map((i) => [i.id, i.icona]));
+  const impIcon = (id: string) => iconById.get(id) || id.slice(0, 1).toUpperCase();
 
   const availBySec = new Map(availabilities.map((a) => [a.secretaryId, a]));
 

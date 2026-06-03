@@ -114,6 +114,7 @@ export async function saveShift(input: {
 export async function saveImpianto(input: {
   id: string;
   nome: string;
+  icona: string;
   weekdayOpen: string;
   weekdayClose: string;
   weekendOpen: string;
@@ -128,6 +129,7 @@ export async function saveImpianto(input: {
     where: { id: data.id },
     update: {
       nome: data.nome,
+      icona: data.icona,
       weekdayOpen: data.weekdayOpen,
       weekdayClose: data.weekdayClose,
       weekendOpen: data.weekendOpen,
@@ -142,6 +144,7 @@ export async function saveImpianto(input: {
 
 export async function createImpianto(input: {
   nome: string;
+  icona: string;
   weekdayOpen: string;
   weekdayClose: string;
   weekendOpen: string;

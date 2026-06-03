@@ -68,6 +68,7 @@ export const updateSecretarySchema = z.object({ id: z.string().min(1), ...secret
 export const impiantoSchema = z.object({
   id: z.string().min(1),
   nome: z.string().trim().min(1, "Il nome non può essere vuoto."),
+  icona: z.string().trim().min(1, "Scegli un'icona.").max(8),
   weekdayOpen: HHMM,
   weekdayClose: HHMM,
   weekendOpen: HHMM,

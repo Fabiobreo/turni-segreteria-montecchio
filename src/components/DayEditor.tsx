@@ -392,7 +392,7 @@ export function DayEditor({
             sx={{ minWidth: 180 }}>
             {impianti.map((imp) => (
               <MenuItem key={imp.id} value={imp.id}>
-                {imp.id === "estivo" ? "☀" : imp.id === "invernale" ? "❄" : ""} {imp.nome}
+                {imp.icona} {imp.nome}
               </MenuItem>
             ))}
           </TextField>

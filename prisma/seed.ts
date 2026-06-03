@@ -13,8 +13,8 @@ const secretaries = [
 ];
 
 const impianti = [
-  { id: "estivo", nome: "Piscina Estiva", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 1 },
-  { id: "invernale", nome: "Piscina Invernale", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 2 },
+  { id: "estivo", nome: "Piscina Estiva", icona: "☀️", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 1 },
+  { id: "invernale", nome: "Piscina Invernale", icona: "❄️", weekdayOpen: "08:00", weekdayClose: "20:30", weekendOpen: "09:00", weekendClose: "19:30", attivo: true, sort: 2 },
 ];
 
 async function main() {

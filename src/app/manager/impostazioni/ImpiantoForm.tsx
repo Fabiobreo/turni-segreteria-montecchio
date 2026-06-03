@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveImpianto, deleteImpianto } from "@/app/manager/actions";
+import { IconaPicker } from "./IconaPicker";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -14,6 +15,7 @@ import Typography from "@mui/material/Typography";
 type Imp = {
   id: string;
   nome: string;
+  icona: string;
   weekdayOpen: string;
   weekdayClose: string;
   weekendOpen: string;
@@ -59,6 +61,8 @@ export function ImpiantoForm({ impianto }: { impianto: Imp }) {
         onChange={(e) => setForm({ ...form, nome: e.target.value })}
         sx={{ maxWidth: 320 }}
       />
+
+      <IconaPicker value={form.icona} onChange={(icona) => setForm({ ...form, icona })} />
 
       <Box>
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1, fontWeight: 600 }}>
