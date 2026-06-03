@@ -184,7 +184,7 @@ async function WeekContent({ monday }: { monday: string }) {
       {/* Ore + avvisi */}
       <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
         <Paper sx={{ p: 2, flex: 1, minWidth: 380 }}>
-          <Typography variant="h3" sx={{ mb: 1.5 }}>Ore allocate (live)</Typography>
+          <Typography variant="h3" sx={{ mb: 1.5 }}>Ore allocate</Typography>
           <Table size="small">
             <TableHead>
               <TableRow>

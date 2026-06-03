@@ -182,10 +182,6 @@ export function DayEditor({
             ))}
           </Box>
 
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1.5 }}>
-            La sotto-riga sceglie l&apos;impianto: trascina sulla riga ☀ per un turno estivo, sulla ❄ per uno invernale. Tasto destro su un turno per spostarlo tra impianti.
-          </Typography>
-
           {/* Gantt */}
           <DayGantt
             open={open} close={close} date={date}
