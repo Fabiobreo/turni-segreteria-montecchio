@@ -3,6 +3,7 @@ import { requireManager } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { ManagerTop } from "@/components/ManagerTop";
 import { ImpiantoForm } from "./ImpiantoForm";
+import { ImpiantoAddForm } from "./ImpiantoAddForm";
 import { ImpiantiListSkeleton } from "@/components/skeletons";
 import Container from "@mui/material/Container";
 import Box from "@mui/material/Box";
@@ -17,8 +18,13 @@ export default async function ImpostazioniPage() {
     <>
       <ManagerTop active="impostazioni" />
       <Container maxWidth="md" sx={{ py: 3 }}>
-        <Typography variant="body2" color="text.secondary">Impostazioni</Typography>
-        <Typography variant="h1" component="h1" sx={{ mb: 3 }}>Impianti e orari</Typography>
+        <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 2, mb: 3, flexWrap: "wrap" }}>
+          <Box>
+            <Typography variant="body2" color="text.secondary">Impostazioni</Typography>
+            <Typography variant="h1" component="h1">Impianti e orari</Typography>
+          </Box>
+          <ImpiantoAddForm />
+        </Box>
 
         <Suspense fallback={<ImpiantiListSkeleton />}>
           <ImpiantiList />

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { saveImpianto } from "@/app/manager/actions";
+import { saveImpianto, deleteImpianto } from "@/app/manager/actions";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
@@ -26,6 +26,7 @@ export function ImpiantoForm({ impianto }: { impianto: Imp }) {
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [form, setForm] = useState<Imp>({ ...impianto });
 
   function submit() {
@@ -35,6 +36,16 @@ export function ImpiantoForm({ impianto }: { impianto: Imp }) {
       const res = await saveImpianto(form);
       if (!res.ok) { setError("Errore nel salvataggio."); return; }
       setSaved(true);
+      router.refresh();
+    });
+  }
+
+  function remove() {
+    setError(null);
+    setSaved(false);
+    startTransition(async () => {
+      const res = await deleteImpianto(impianto.id);
+      if (!res.ok) { setError(res.error ?? "Errore nell'eliminazione."); setConfirmDelete(false); return; }
       router.refresh();
     });
   }
@@ -82,10 +93,25 @@ export function ImpiantoForm({ impianto }: { impianto: Imp }) {
         label="Impianto attivo (incluso nella verifica copertura)"
       />
 
-      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+      <Box sx={{ display: "flex", gap: 1.5, alignItems: "center", flexWrap: "wrap" }}>
         <Button variant="contained" size="small" onClick={submit} disabled={pending}>
           {pending ? "Salvo…" : "Salva"}
         </Button>
+        {!confirmDelete ? (
+          <Button variant="text" color="error" size="small" onClick={() => setConfirmDelete(true)} disabled={pending}>
+            Elimina
+          </Button>
+        ) : (
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <Typography variant="caption" color="text.secondary">Eliminare «{impianto.nome}»?</Typography>
+            <Button variant="contained" color="error" size="small" onClick={remove} disabled={pending}>
+              {pending ? "Elimino…" : "Sì, elimina"}
+            </Button>
+            <Button variant="text" size="small" onClick={() => setConfirmDelete(false)} disabled={pending}>
+              Annulla
+            </Button>
+          </Box>
+        )}
         {saved && <Alert severity="success" sx={{ py: 0.25, fontSize: "0.8rem" }}>Salvato.</Alert>}
         {error && <Alert severity="error" sx={{ py: 0.25, fontSize: "0.8rem" }}>{error}</Alert>}
       </Box>

@@ -12,6 +12,7 @@ import {
   addSecretarySchema,
   updateSecretarySchema,
   impiantoSchema,
+  createImpiantoSchema,
   parseSlots,
   ISODate,
   firstError,
@@ -135,6 +136,49 @@ export async function saveImpianto(input: {
     },
     create: { ...data, sort: data.id === "estivo" ? 1 : 2 },
   });
+  revalidatePath("/manager", "layout");
+  return { ok: true };
+}
+
+export async function createImpianto(input: {
+  nome: string;
+  weekdayOpen: string;
+  weekdayClose: string;
+  weekendOpen: string;
+  weekendClose: string;
+  attivo: boolean;
+}) {
+  await requireManager();
+  const parsed = createImpiantoSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
+  const data = parsed.data;
+
+  // Genera un id univoco dallo slug del nome (es. "Piscina Comunale" -> "piscina-xxxx").
+  const slug = data.nome.toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // rimuove accenti
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 16) || "impianto";
+  const rand = Math.random().toString(36).slice(2, 6);
+  const id = `${slug}-${rand}`;
+
+  const agg = await prisma.impianto.aggregate({ _max: { sort: true } });
+  await prisma.impianto.create({
+    data: { id, ...data, sort: (agg._max.sort ?? 0) + 1 },
+  });
+  revalidatePath("/manager", "layout");
+  return { ok: true };
+}
+
+export async function deleteImpianto(id: string) {
+  await requireManager();
+  // I turni referenziano l'impianto via stringa (nessuna FK): non eliminare se ci sono turni.
+  const turni = await prisma.shift.count({ where: { impianto: id } });
+  if (turni > 0) {
+    return {
+      ok: false,
+      error: `Impossibile eliminare: ci sono ${turni} turni assegnati a questo impianto. Disattivalo invece di eliminarlo.`,
+    };
+  }
+  await prisma.impianto.delete({ where: { id } });
   revalidatePath("/manager", "layout");
   return { ok: true };
 }

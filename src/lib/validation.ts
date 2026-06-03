@@ -75,6 +75,9 @@ export const impiantoSchema = z.object({
   attivo: z.boolean(),
 });
 
+/** Nuovo impianto: l'id viene generato dal server, qui non serve. */
+export const createImpiantoSchema = impiantoSchema.omit({ id: true });
+
 /** Primo messaggio d'errore leggibile da un ZodError. */
 export function firstError(err: z.ZodError): string {
   return err.issues[0]?.message ?? "Dati non validi.";
